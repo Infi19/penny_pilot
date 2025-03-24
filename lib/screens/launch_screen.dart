@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LaunchScreen extends StatelessWidget {
   const LaunchScreen({super.key});
@@ -81,7 +83,12 @@ class LaunchScreen extends StatelessWidget {
               
               // Sign Up Button
               OutlinedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                  );
+                },
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Color(0xFFd1a6ff)), // Light purple
                   minimumSize: const Size(double.infinity, 56),
@@ -100,14 +107,20 @@ class LaunchScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               
-              // Forgot Password Link
+              // Forgot Password Button
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                  );
+                },
                 child: Text(
                   'Forgot Password?',
                   style: TextStyle(
-                    color: Color(0xFFd1a6ff), // Light purple
+                    color: Color(0xFFe6ccff), // Lightest purple
                     fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -117,4 +130,4 @@ class LaunchScreen extends StatelessWidget {
       ),
     );
   }
-} 
+}
