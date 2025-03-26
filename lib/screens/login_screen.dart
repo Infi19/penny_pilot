@@ -5,6 +5,7 @@ import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../utils/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF4b0082), // Darkest purple background
+      backgroundColor: AppColors.darkest,
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -36,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Text(
                 'Welcome',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: AppColors.lightest,
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                 ),
@@ -47,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.darkGrey,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
@@ -70,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               const Text(
                                 'Username Or Email',
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  color: AppColors.lightest,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -78,14 +79,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               const SizedBox(height: 8),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFe6ccff), // Lightest purple
+                                  color: AppColors.darkest,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: TextField(
                                   controller: _emailController,
+                                  style: const TextStyle(color: AppColors.lightest),
                                   decoration: InputDecoration(
                                     hintText: 'example@example.com',
-                                    hintStyle: TextStyle(color: Colors.grey.shade600),
+                                    hintStyle: TextStyle(color: AppColors.lightGrey),
                                     border: InputBorder.none,
                                     contentPadding: const EdgeInsets.all(16),
                                   ),
@@ -105,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               const Text(
                                 'Password',
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  color: AppColors.lightest,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -113,21 +115,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               const SizedBox(height: 8),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFe6ccff), // Lightest purple
+                                  color: AppColors.darkest,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: TextField(
                                   controller: _passwordController,
                                   obscureText: _obscurePassword,
+                                  style: const TextStyle(color: AppColors.lightest),
                                   decoration: InputDecoration(
                                     hintText: '••••••••',
-                                    hintStyle: TextStyle(color: Colors.grey.shade600),
+                                    hintStyle: TextStyle(color: AppColors.lightGrey),
                                     border: InputBorder.none,
                                     contentPadding: const EdgeInsets.all(16),
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                        color: const Color(0xFF6a0dad), // Medium-dark purple
+                                        color: AppColors.mediumGrey,
                                       ),
                                       onPressed: () {
                                         setState(() {
@@ -149,18 +152,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFa64dff), // Medium purple
+                              backgroundColor: AppColors.mediumGrey,
+                              foregroundColor: AppColors.lightest,
                               minimumSize: const Size(double.infinity, 56),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                             child: _isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
+                                ? const CircularProgressIndicator(color: AppColors.lightest)
                                 : const Text(
                               'Log In',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppColors.lightest,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -179,10 +183,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            child: Text(
+                            child: const Text(
                               'Forgot Password?',
                               style: TextStyle(
-                                color: Color(0xFF6a0dad), // Medium-dark purple
+                                color: AppColors.lightGrey,
                                 fontSize: 14,
                               ),
                             ),
@@ -200,66 +204,85 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            style: TextButton.styleFrom(
-                              backgroundColor: const Color(0xFFe6ccff), // Lightest purple
-                              minimumSize: const Size(120, 40),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                            child: Text(
-                              'Sign Up',
+                            child: const Text(
+                              'Don\'t have an account? Sign Up',
                               style: TextStyle(
-                                color: Color(0xFF4b0082), // Darkest purple
+                                color: AppColors.lightGrey,
                                 fontSize: 14,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                         ),
-                        
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Text(
-                            'or sign in with',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        
-                        // Google Sign In button
-                        _socialButton(Icons.g_mobiledata),
                         
                         const SizedBox(height: 20),
                         
-                        // Sign up text
+                        // Divider
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
-                              "Don't have an account? ",
-                              style: TextStyle(color: Colors.black54),
+                            Expanded(
+                              child: Divider(
+                                color: AppColors.lightGrey.withOpacity(0.3),
+                                thickness: 1,
+                              ),
                             ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const SignUpScreen(),
-                                  ),
-                                );
-                              },
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
                               child: Text(
-                                'Sign Up',
+                                'OR',
                                 style: TextStyle(
-                                  color: Color(0xFF6a0dad), // Medium-dark purple
-                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.lightGrey,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
+                            Expanded(
+                              child: Divider(
+                                color: AppColors.lightGrey.withOpacity(0.3),
+                                thickness: 1,
+                              ),
+                            ),
                           ],
+                        ),
+
+                        const SizedBox(height: 20),
+                        
+                        // Google Sign In Button
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 400),
+                          child: OutlinedButton(
+                            onPressed: _handleGoogleSignIn,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.mediumGrey),
+                              minimumSize: const Size(double.infinity, 56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Image.asset(
+                                  'assets/google_logo.png',
+                                  width: 24,
+                                  height: 24,
+                                  errorBuilder: (context, error, stackTrace) => const Icon(
+                                    Icons.g_mobiledata,
+                                    color: AppColors.lightest,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    color: AppColors.lightest,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -273,24 +296,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
   
-  Widget _socialButton(IconData icon) {
-    return InkWell(
-      onTap: icon == Icons.g_mobiledata ? _handleGoogleSignIn : null,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFd1a6ff)), // Light purple
-        ),
-        child: Icon(
-          icon,
-          color: const Color(0xFF6a0dad), // Medium-dark purple
-        ),
-      ),
-    );
-  }
-
   Future<void> _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

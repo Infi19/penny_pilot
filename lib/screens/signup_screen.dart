@@ -31,7 +31,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -46,7 +46,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPurple,
+                    color: AppColors.lightest,
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -83,7 +83,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.hintPurple,
+                      color: AppColors.lightGrey,
                     ),
                     onPressed: () {
                       setState(() {
@@ -101,7 +101,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                      color: AppColors.hintPurple,
+                      color: AppColors.lightGrey,
                     ),
                     onPressed: () {
                       setState(() {
@@ -115,7 +115,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 RichText(
                   text: TextSpan(
                     style: TextStyle(
-                      color: AppColors.hintPurple,
+                      color: AppColors.lightGrey,
                       fontSize: 14,
                     ),
                     children: [
@@ -123,7 +123,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       TextSpan(
                         text: 'Terms of Use',
                         style: TextStyle(
-                          color: AppColors.primaryPurple,
+                          color: AppColors.mediumGrey,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -131,7 +131,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       TextSpan(
                         text: 'Privacy Policy',
                         style: TextStyle(
-                          color: AppColors.primaryPurple,
+                          color: AppColors.mediumGrey,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -184,7 +184,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryPurple,
+                      backgroundColor: AppColors.mediumGrey,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -194,7 +194,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: AppColors.lightest,
                               strokeWidth: 2,
                             ),
                           )
@@ -203,7 +203,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.lightest,
                             ),
                           ),
                   ),
@@ -215,7 +215,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     Text(
                       'Already have an account? ',
                       style: TextStyle(
-                        color: AppColors.hintPurple,
+                        color: AppColors.lightGrey,
                       ),
                     ),
                     GestureDetector(
@@ -228,7 +228,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       child: Text(
                         'Log In',
                         style: TextStyle(
-                          color: AppColors.primaryPurple,
+                          color: AppColors.mediumGrey,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -259,7 +259,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: AppColors.textPurple,
+            color: AppColors.lightest,
           ),
         ),
         const SizedBox(height: 8),
@@ -267,35 +267,29 @@ class _SignUpScreenState extends State<SignUpScreen> {
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          style: const TextStyle(color: AppColors.lightest),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: AppColors.hintPurple,
-              fontSize: 14,
+              color: AppColors.lightGrey,
             ),
+            fillColor: AppColors.darkGrey,
             filled: true,
-            fillColor: AppColors.lightPurple,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
             suffixIcon: suffixIcon,
           ),
           validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'This field is required';
-            }
-            if (keyboardType == TextInputType.emailAddress) {
-              if (!RegExp(r'^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$').hasMatch(value)) {
+            if (controller != null) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter $label';
+              }
+              if (controller == _emailController && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                 return 'Please enter a valid email';
               }
-            }
-            if (label.toLowerCase().contains('password')) {
-              if (value.length < 6) {
+              if ((controller == _passwordController || controller == _confirmPasswordController) && value.length < 6) {
                 return 'Password must be at least 6 characters';
               }
             }

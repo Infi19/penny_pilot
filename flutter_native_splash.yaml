@@ -1,0 +1,13 @@
+flutter_native_splash:
+  # Replace this with your desired background color
+  color: "#4b0082"
+  # Or use an image background
+  # background_image: "assets/background.png"
+  
+  # Your app logo
+  # image: assets/your_logo.png
+  
+  # Optional parameters
+  android: true
+  ios: true
+  web: false 

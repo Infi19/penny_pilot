@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'launch_screen.dart';
+import '../utils/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -55,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF4b0082), // Darkest purple background
+      backgroundColor: AppColors.background, // Main orange background
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
@@ -72,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFe6ccff), // Lightest purple
+                        color: AppColors.secondary, // Light orange
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
@@ -85,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       child: const Center(
                         child: Icon(
                           Icons.account_balance_wallet,
-                          color: Color(0xFF6a0dad), // Medium-dark purple
+                          color: AppColors.white, // White icon
                           size: 60,
                         ),
                       ),
@@ -96,7 +97,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     const Text(
                       'Penny Pilot',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.white,
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.2,
@@ -104,11 +105,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                     const SizedBox(height: 8),
                     
-                    // Subtitle with shimmer effect
-                    Text(
+                    // Subtitle
+                    const Text(
                       'Your Personal Finance Navigator',
                       style: TextStyle(
-                        color: Color(0xFFd1a6ff), // Light purple
+                        color: AppColors.quaternary, // Light beige
                         fontSize: 18,
                         letterSpacing: 0.5,
                       ),

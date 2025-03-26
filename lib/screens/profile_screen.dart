@@ -76,7 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Profile updated successfully'),
-                backgroundColor: AppColors.primaryPurple,
+                backgroundColor: AppColors.mediumGrey,
               ),
             );
           }
@@ -99,20 +99,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: AppColors.primaryPurple,
+          backgroundColor: AppColors.darkGrey,
           title: const Text(
             'Logout',
-            style: TextStyle(color: Colors.white),
+            style: TextStyle(color: AppColors.lightest),
           ),
           content: const Text(
             'Are you sure you want to logout?',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(color: AppColors.lightGrey),
           ),
           actions: [
             TextButton(
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFFe6ccff)),
+                style: TextStyle(color: AppColors.mediumGrey),
               ),
               onPressed: () {
                 Navigator.of(context).pop();
@@ -121,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextButton(
               child: const Text(
                 'Logout',
-                style: TextStyle(color: Color(0xFFe6ccff)),
+                style: TextStyle(color: AppColors.lightest),
               ),
               onPressed: () async {
                 await _authService.signOut();
@@ -147,22 +147,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = _authService.getCurrentUser();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'Profile',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: AppColors.lightest),
         ),
-        backgroundColor: AppColors.primaryPurple,
+        backgroundColor: AppColors.darkGrey,
         actions: [
           if (_isEditing)
             IconButton(
-              icon: const Icon(Icons.save, color: Colors.white),
+              icon: const Icon(Icons.save, color: AppColors.lightest),
               onPressed: _updateProfile,
             )
           else
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.white),
+              icon: const Icon(Icons.edit, color: AppColors.lightest),
               onPressed: () => setState(() => _isEditing = true),
             ),
         ],
@@ -179,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 50,
-                      backgroundColor: AppColors.lightPurple,
+                      backgroundColor: AppColors.mediumGrey,
                       backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
                       child: user?.photoURL == null
                           ? Text(
@@ -189,9 +189,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ? user!.displayName![0]
                                           : '?')
                                   .toUpperCase(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 36,
-                                color: AppColors.primaryPurple,
+                                color: AppColors.darkGrey,
                                 fontWeight: FontWeight.bold,
                               ),
                             )
@@ -204,12 +204,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryPurple,
+                            color: AppColors.mediumGrey,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Icon(
                             Icons.camera_alt,
-                            color: Colors.white,
+                            color: AppColors.darkest,
                             size: 20,
                           ),
                         ),
@@ -221,26 +221,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Email
               ListTile(
-                leading: Icon(Icons.email, color: AppColors.primaryPurple),
-                title: const Text('Email'),
-                subtitle: Text(_userData?['email'] ?? user?.email ?? 'No email'),
+                leading: const Icon(Icons.email, color: AppColors.mediumGrey),
+                title: const Text('Email', style: TextStyle(color: AppColors.lightest)),
+                subtitle: Text(
+                  _userData?['email'] ?? user?.email ?? 'No email',
+                  style: const TextStyle(color: AppColors.lightGrey),
+                ),
               ),
-              const Divider(),
+              Divider(color: AppColors.darkGrey),
 
               // Name
               ListTile(
-                leading: Icon(Icons.person, color: AppColors.primaryPurple),
-                title: const Text('Full Name'),
+                leading: const Icon(Icons.person, color: AppColors.mediumGrey),
+                title: const Text('Full Name', style: TextStyle(color: AppColors.lightest)),
                 subtitle: _isEditing
                     ? TextFormField(
                         controller: _nameController,
+                        style: const TextStyle(color: AppColors.lightest),
                         decoration: InputDecoration(
                           hintText: 'Enter your name',
+                          hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
                           enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primaryPurple),
+                            borderSide: BorderSide(color: AppColors.mediumGrey),
                           ),
                           focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primaryPurple),
+                            borderSide: BorderSide(color: AppColors.mediumGrey),
                           ),
                         ),
                         validator: (value) {
@@ -250,57 +255,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           return null;
                         },
                       )
-                    : Text(_userData?['displayName'] ?? user?.displayName ?? 'No name set'),
+                    : Text(
+                        _userData?['displayName'] ?? user?.displayName ?? 'No name set',
+                        style: const TextStyle(color: AppColors.lightGrey),
+                      ),
               ),
-              const Divider(),
+              Divider(color: AppColors.darkGrey),
 
               // Phone
               ListTile(
-                leading: Icon(Icons.phone, color: AppColors.primaryPurple),
-                title: const Text('Phone Number'),
+                leading: const Icon(Icons.phone, color: AppColors.mediumGrey),
+                title: const Text('Phone', style: TextStyle(color: AppColors.lightest)),
                 subtitle: _isEditing
                     ? TextFormField(
                         controller: _phoneController,
-                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(color: AppColors.lightest),
                         decoration: InputDecoration(
                           hintText: 'Enter your phone number',
+                          hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
                           enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primaryPurple),
+                            borderSide: BorderSide(color: AppColors.mediumGrey),
                           ),
                           focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primaryPurple),
+                            borderSide: BorderSide(color: AppColors.mediumGrey),
                           ),
                         ),
                       )
-                    : Text(_userData?['phone'] ?? 'No phone number'),
+                    : Text(
+                        _userData?['phone'] ?? 'No phone number',
+                        style: const TextStyle(color: AppColors.lightGrey),
+                      ),
               ),
-              const Divider(),
+              Divider(color: AppColors.darkGrey),
+
+              const SizedBox(height: 30),
 
               // Logout Button
-              const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _showLogoutDialog,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade400,
+                    backgroundColor: AppColors.darkGrey,
+                    foregroundColor: AppColors.lightest,
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.logout,
-                    color: Colors.white,
-                  ),
-                  label: const Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Colors.white,
+                    textStyle: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
+                  child: const Text('Logout'),
                 ),
               ),
             ],

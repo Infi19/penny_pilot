@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_screen.dart';
+import 'ai_assistant_screen.dart';
+import 'learn_screen.dart';
+import '../services/auth_service.dart';
+import '../utils/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,16 +15,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  final AuthService _authService = AuthService();
 
   final List<Widget> _screens = [
     const HomeContent(),
+    const AIAssistantScreen(),
+    const LearnScreen(),
     const ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF4b0082), // Darkest purple
+      backgroundColor: AppColors.background,
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -28,13 +36,22 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentIndex = index;
           });
         },
-        backgroundColor: const Color(0xFF6a0dad),
-        selectedItemColor: const Color(0xFFe6ccff),
-        unselectedItemColor: Colors.white60,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppColors.darkGrey,
+        selectedItemColor: AppColors.lightest,
+        unselectedItemColor: AppColors.lightGrey,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'AI Assistant',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Learn',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
@@ -51,323 +68,265 @@ class HomeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.displayName ?? 'Investor';
+
     return SafeArea(
-      child: Column(
-        children: [
-          // Header Section
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Hi, Welcome Back',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Good Morning',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        // Switch to profile tab
-                        (context as Element)
-                            .findAncestorStateOfType<_HomeScreenState>()
-                            ?.setState(() {
-                          (context as Element)
-                              .findAncestorStateOfType<_HomeScreenState>()
-                              ?._currentIndex = 1;
-                        });
-                      },
-                      child: const CircleAvatar(
-                        backgroundColor: Color(0xFFe6ccff),
-                        child: Icon(
-                          Icons.person,
-                          color: Color(0xFF6a0dad),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Balance Section
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6a0dad), // Medium-dark purple
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header Section
+            Container(
+              padding: const EdgeInsets.all(20.0),
+              decoration: const BoxDecoration(
+                color: AppColors.darkest,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Total Balance',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const Text(
-                                '\$7,783.00',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                'Total Expense',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const Text(
-                                '-\$1,187.40',
-                                style: TextStyle(
-                                  color: Color(0xFFe6ccff),
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          const Icon(
+                            Icons.account_balance_wallet,
+                            color: AppColors.white,
+                            size: 40,
+                          )
+                          ,
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Penny Pilot',
+                            style: TextStyle(
+                              color: AppColors.lightest,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: 0.3,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Color(0xFFa64dff), // Medium purple
-                          ),
-                          minHeight: 8,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '30% Of Your Expenses, Looks Good.',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
-                      ),
+                      const Icon(Icons.notifications, color: AppColors.lightest),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-          
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                children: [
-                  // Quick Stats Card
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFe6ccff), // Lightest purple
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.directions_car,
-                                    color: Color(0xFF6a0dad),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    '86:48:23:01',
-                                    style: TextStyle(
-                                      color: Color(0xFF4b0082),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'On Goals',
-                                style: TextStyle(
-                                  color: const Color(0xFF4b0082).withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: const Color(0xFF6a0dad).withOpacity(0.2),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Row(
-                                  children: [
-                                    Icon(
-                                      Icons.account_balance_wallet,
-                                      color: Color(0xFF6a0dad),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      '\$4,000.00',
-                                      style: TextStyle(
-                                        color: Color(0xFF4b0082),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Revenue Last Week',
-                                  style: TextStyle(
-                                    color: const Color(0xFF4b0082).withOpacity(0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 20),
+                  Text(
+                    'Hi $userName,',
+                    style: const TextStyle(
+                      color: AppColors.lightest,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  
-                  // Main Features Grid
-                  Expanded(
-                    child: GridView.count(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 20,
-                      crossAxisSpacing: 20,
-                      children: [
-                        _featureCard(
-                          icon: Icons.chat_bubble_outline,
-                          title: 'Chat with AI',
-                          subtitle: 'Get investment advice',
-                          color: const Color(0xFF6a0dad),
-                        ),
-                        _featureCard(
-                          icon: Icons.analytics_outlined,
-                          title: 'Risk Profile',
-                          subtitle: 'View recommendations',
-                          color: const Color(0xFFa64dff),
-                        ),
-                        _featureCard(
-                          icon: Icons.school_outlined,
-                          title: 'Learn',
-                          subtitle: 'Financial literacy',
-                          color: const Color(0xFF6a0dad),
-                        ),
-                        _featureCard(
-                          icon: Icons.trending_up,
-                          title: 'Market Trends',
-                          subtitle: 'AI-powered insights',
-                          color: const Color(0xFFa64dff),
-                        ),
-                      ],
+                  const Text(
+                    "let's make smart investments today!",
+                    style: TextStyle(
+                      color: AppColors.lightGrey,
+                      fontSize: 16,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+
+            // Main Features Section
+            Container(
+              color: AppColors.background,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Chat with AI Assistant Card
+                  Card(
+                    color: AppColors.darkGrey,
+                    elevation: 4,
+                    child: ListTile(
+                      leading: const Icon(Icons.chat, color: AppColors.lightest),
+                      title: const Text(
+                        'Chat with AI Assistant',
+                        style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'Get personalized investment advice',
+                        style: TextStyle(color: AppColors.lightGrey),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward, color: AppColors.lightest),
+                      onTap: () {
+                        // Navigate to AI Assistant screen
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Risk Profile & Recommendations
+                  const Text(
+                    'Your Investment Profile',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.lightest,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Card(
+                    color: AppColors.darkGrey,
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Risk Profile',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.lightest,
+                                ),
+                              ),
+                              Text(
+                                'Moderate',
+                                style: TextStyle(
+                                  color: AppColors.mediumGrey,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          LinearProgressIndicator(
+                            value: 0.5,
+                            backgroundColor: AppColors.darkest,
+                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.mediumGrey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Financial Literacy Hub
+                  const Text(
+                    'Financial Literacy',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.lightest,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 150,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _buildEducationCard(
+                          'Basics of Investing',
+                          'Learn the fundamentals of investment',
+                          Icons.school,
+                        ),
+                        _buildEducationCard(
+                          'Market Analysis',
+                          'Understanding market trends',
+                          Icons.trending_up,
+                        ),
+                        _buildEducationCard(
+                          'Risk Management',
+                          'Strategies to manage risk',
+                          Icons.security,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Market Trends Section
+                  const Text(
+                    'Market Insights',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.lightest,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Card(
+                    color: AppColors.darkGrey,
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.trending_up, color: AppColors.mediumGrey),
+                              SizedBox(width: 10),
+                              Text(
+                                'Today\'s Trend',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.lightest,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Markets showing positive momentum with technology sector leading gains.',
+                            style: const TextStyle(
+                              color: AppColors.lightGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _featureCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-  }) {
+  Widget _buildEducationCard(String title, String subtitle, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withOpacity(0.2),
-          width: 1,
+      width: 200,
+      margin: const EdgeInsets.only(right: 15),
+      child: Card(
+        color: AppColors.darkGrey,
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppColors.mediumGrey),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.lightest,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.lightGrey,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 32,
-          ),
-          const Spacer(),
-          Text(
-            title,
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: color.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-        ],
       ),
     );
   }
