@@ -308,8 +308,13 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result?.user != null) {
-        // Get user profile data with retry mechanism already in place
-        final userData = await _userService.getUserProfile(result!.user!.uid);
+        try {
+          // Get user profile data with retry mechanism already in place
+          await _userService.getUserProfile(result!.user!.uid);
+        } catch (e) {
+          print('Warning: Could not fetch user profile immediately after login: $e');
+          // Continue anyway since auth was successful
+        }
         
         if (!mounted) return;
 
