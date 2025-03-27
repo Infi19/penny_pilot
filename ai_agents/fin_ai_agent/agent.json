@@ -1,0 +1,12 @@
+{
+  "displayName": "FinAgentAi",
+  "defaultLanguageCode": "en",
+  "timeZone": "America/Los_Angeles",
+  "projectNumber": 186241876081,
+  "advancedSettings": {
+    "loggingSettings": {
+    
+    }
+  },
+  "startPlaybook": "Playbook for Investment simplified guide"
+}

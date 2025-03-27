@@ -28,13 +28,24 @@ class UserService {
   }
 
   Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
-    try {
+  try {
+    final docRef = _firestore.collection('users').doc(userId);
+    final doc = await docRef.get();
+    
+    if (doc.exists) {
+      // Update existing document
       await RetryHelper.withRetry(
-        operation: () => _firestore.collection('users').doc(userId).update(data),
+        operation: () => docRef.update(data),
       );
-    } catch (e) {
-      print('Error updating user profile: $e');
-      rethrow;
+    } else {
+      // Create new document
+      await RetryHelper.withRetry(
+        operation: () => docRef.set(data),
+      );
     }
+  } catch (e) {
+    print('Error updating user profile: $e');
+    rethrow;
   }
+}
 }
