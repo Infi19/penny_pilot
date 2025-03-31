@@ -6,9 +6,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/launch_screen.dart';
+import 'package:firebase_vertexai/firebase_vertexai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables from .env file
+  await dotenv.load();
+  
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

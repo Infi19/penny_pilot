@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 import '../utils/app_colors.dart';
 import '../services/ai_agent_service.dart';
@@ -243,12 +244,83 @@ class _ChatUIState extends State<ChatUI> {
                   color: isUser ? AppColors.primary.withOpacity(0.8) : AppColors.darkGrey,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(
-                  message.content,
-                  style: TextStyle(
-                    color: AppColors.lightest,
-                  ),
-                ),
+                child: isUser 
+                    ? Text(
+                        message.content,
+                        style: const TextStyle(
+                          color: AppColors.lightest,
+                        ),
+                      ) 
+                    : MarkdownBody(
+                        data: message.content,
+                        styleSheet: MarkdownStyleSheet(
+                          h1: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          h2: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          h3: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          h4: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          p: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.lightest,
+                          ),
+                          listBullet: const TextStyle(
+                            color: AppColors.lightest,
+                          ),
+                          strong: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          em: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.lightest,
+                          ),
+                          blockquote: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.lightGrey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          blockquoteDecoration: BoxDecoration(
+                            color: AppColors.background.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          blockquotePadding: const EdgeInsets.all(8),
+                          tableHead: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                          tableBody: const TextStyle(
+                            color: AppColors.lightest,
+                          ),
+                          tableBorder: TableBorder.all(
+                            color: AppColors.lightGrey,
+                            width: 0.5,
+                          ),
+                          tableCellsPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                        ),
+                        softLineBreak: true,
+                      ),
               ),
             ),
             const SizedBox(width: 8),
