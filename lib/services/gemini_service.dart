@@ -1,10 +1,16 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:collection';
 
 class GeminiService {
   static GeminiService? _instance;
   late GenerativeModel _model;
   final Map<String, ChatSession> _agentSessions = {};
+  // LRU cache to store recent responses
+  final int _cacheSize = 50;
+  final Map<String, String> _responseCache = LinkedHashMap(equals: (a, b) => a == b, hashCode: (k) => k.hashCode);
 
   // Private constructor
   GeminiService._() {
@@ -13,15 +19,16 @@ class GeminiService {
       throw Exception('Gemini API key not found. Please add your API key to .env file');
     }
     
-    // Initialize the model with the API key
+    // Initialize the model with the API key - using gemini-flash for faster responses
     _model = GenerativeModel(
-      model: 'gemini-1.5-pro',
+      model: 'gemini-2.0-flash', // Using the faster model variant
       apiKey: apiKey,
       generationConfig: GenerationConfig(
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 1024,
+        temperature: 0.4, // Lower temperature for faster and more consistent responses 
+        topP: 0.7,
+        topK: 20,
+        maxOutputTokens: 800, // Reduced max tokens for faster responses
+        stopSequences: ['\n\n\n'],
       ),
     );
   }
@@ -49,9 +56,29 @@ class GeminiService {
     return session;
   }
 
+  // Generate a cache key for the message
+  String _generateCacheKey(String agentType, String message) {
+    return '$agentType:${message.trim()}';
+  }
+
+  // Add a response to the cache
+  void _addToCache(String key, String response) {
+    // If cache is full, remove the oldest entry
+    if (_responseCache.length >= _cacheSize) {
+      _responseCache.remove(_responseCache.keys.first);
+    }
+    _responseCache[key] = response;
+  }
+
   // Send a message to the model and get a response
   Future<String> sendMessage(String agentType, String message) async {
     try {
+      // Check if the response is cached
+      final cacheKey = _generateCacheKey(agentType, message);
+      if (_responseCache.containsKey(cacheKey)) {
+        return _responseCache[cacheKey]!;
+      }
+
       final session = getOrCreateSession(agentType);
       
       // For the first message, prepend the system prompt
@@ -67,10 +94,13 @@ class GeminiService {
       final response = await session.sendMessage(Content.text(prompt));
       
       // Get the response text
-      final responseText = response.text;
+      final responseText = response.text ?? 'Sorry, I couldn\'t generate a response.';
       
-      // Return the response, or a default message if empty
-      return responseText ?? 'Sorry, I couldn\'t generate a response.';
+      // Cache the response
+      _addToCache(cacheKey, responseText);
+      
+      // Return the response
+      return responseText;
     } catch (e) {
       return 'Sorry, an error occurred: $e';
     }
@@ -85,34 +115,62 @@ class GeminiService {
   
   // Get the system prompt based on agent type
   String _getSystemPromptForAgent(String agentType) {
-    String basePrompt = 'Format your responses using proper Markdown with appropriate headings (# for main headings, ## for subheadings, ### for sections), bullet points, and emphasis where needed. '
-                        'For lists, use proper Markdown bullet points (- or *). For emphasis, use **bold** or *italic* appropriately. '
-                        'For important notes, use > blockquotes. For tables, use proper Markdown table syntax with headers, separators, and rows. '
-                        'Structure your responses to be easily readable with clear headings and sections. ';
+    // Simplify base prompt to reduce token count
+    String basePrompt = 'Use Markdown for your responses. ';
     
     switch (agentType) {
       case 'finance':
-        return basePrompt + 'You are a Finance Expert specializing in personal finance, investments, and financial planning. '
-               'Provide clear, accurate, and helpful financial advice tailored to users of different knowledge levels. '
-               'Explain complex financial concepts in simple terms and suggest practical steps users can take to improve their financial situation.';
+        return basePrompt + 'You are a GenAI-powered financial investment assistant for Indian users. '
+               'Help users make better investment decisions with practical guidance on financial concepts. '
+               'Explain finance concepts simply, without jargon. '
+               'Be aware of Indian investment practices and currency (rupees).\n\n'
+               'Guidelines:\n'
+               '- Answer investment and financial questions only\n'
+               '- Be clear and concise\n'
+               '- Use simple language\n'
+               '- Focus on Indian financial context\n'
+               '- Display monetary amounts in rupees (₹)\n'
+               '- Consider Indian preferences like gold, real estate, FDs, mutual funds\n'
+               '- Give general insights, not specific product recommendations';
       
       case 'fraud':
-        return basePrompt + 'You are a Fraud Detective specializing in identifying and explaining financial scams and frauds. '
-               'Help users understand common fraud schemes, warning signs, and how to protect themselves from financial fraud. '
-               'Provide practical advice on what to do if they suspect they\'ve been targeted by fraudsters.';
+        return basePrompt + 'You are a GenAI-powered Fraud Detection Assistant for Indian users. '
+               'Help users identify and protect themselves from financial scams and frauds. '
+               'Guidelines:\n'
+               '- Identify financial scams and frauds\n'
+               '- Explain warning signs and red flags\n'
+               '- Provide practical protection advice\n'
+               '- Guide on reporting fraud\n'
+               '- Focus on Indian financial context\n'
+               '- Use simple language\n'
+               '- Include examples and action steps';
       
       case 'mythbusting':
-        return basePrompt + 'You are a Financial Myth Buster who specializes in debunking common financial misconceptions. '
-               'Clarify financial misinformation with evidence-based explanations and facts. '
-               'Help users understand the reality behind financial myths and provide them with accurate information.';
+        return basePrompt + 'You are a GenAI-powered Financial Myth Buster for Indian users. '
+               'Help users understand financial concepts by debunking misconceptions. '
+               'Guidelines:\n'
+               '- Debunk financial misconceptions\n'
+               '- Provide evidence-based explanations\n'
+               '- Explain why myths persist\n'
+               '- Offer alternative approaches\n'
+               '- Focus on Indian financial context\n'
+               '- Use simple language\n'
+               '- Include examples and data';
       
       case 'roadmap':
-        return basePrompt + 'You are a Financial Roadmap Guide who helps users navigate their financial journey. '
-               'Provide step-by-step guidance on setting and achieving financial goals, from budgeting to retirement planning. '
-               'Tailor your advice to different life stages and financial situations.';
+        return basePrompt + 'You are a GenAI-powered financial roadmap assistant for Indian users. '
+               'Help create personalized financial roadmaps to achieve goals. '
+               'Guidelines:\n'
+               '- Ask for necessary financial information\n'
+               '- Create clear, actionable roadmaps\n'
+               '- Use Indian financial strategies (SIPs, PPF, NPS, FDs)\n'
+               '- Display amounts in rupees (₹)\n'
+               '- Base on proven strategies but adapt for Indian market\n'
+               '- Provide realistic steps with timelines\n'
+               '- Give general advice, not specific product recommendations';
       
       default:
-        return basePrompt + 'You are a helpful AI assistant that provides accurate and useful information about financial topics.';
+        return basePrompt + 'You are a helpful AI assistant for financial topics.';
     }
   }
 } 

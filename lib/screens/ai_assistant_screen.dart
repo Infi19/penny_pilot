@@ -15,6 +15,7 @@ class AIAssistantScreen extends StatefulWidget {
 class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final AIAgentService _aiAgentService = AIAgentService();
+  final Map<String, UniqueKey> _chatKeys = {};
   final List<AgentInfo> _agents = [
     AgentInfo(
       name: 'Finance Expert',
@@ -50,6 +51,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
   void initState() {
     super.initState();
     _tabController = TabController(length: _agents.length, vsync: this);
+    for (final agent in _agents) {
+      _chatKeys[agent.type] = UniqueKey();
+    }
   }
 
   @override
@@ -88,14 +92,16 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
       try {
         await _aiAgentService.deleteChatSession(currentAgent.type);
         
+        // Generate a new key for the agent to force rebuild of ChatUI
+        setState(() {
+          _chatKeys[currentAgent.type] = UniqueKey();
+        });
+        
         // Show success message
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Chat history cleared')),
           );
-          
-          // Refresh the screen to show empty chat
-          setState(() {});
         }
       } catch (e) {
         if (mounted) {
@@ -246,9 +252,10 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
             ],
           ),
         ),
-        // Chat UI
+        // Chat UI with key for rebuild
         Expanded(
           child: ChatUI(
+            key: _chatKeys[agent.type],
             agentType: agent.type,
             agentName: agent.name,
             agentIcon: agent.icon,

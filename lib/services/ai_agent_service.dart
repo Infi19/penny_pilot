@@ -4,11 +4,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/retry_helper.dart';
 import 'gemini_service.dart';
+import 'dart:async';
 
 class AIAgentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GeminiService _geminiService = GeminiService();
+  
+  // Cache session IDs to avoid repeated Firestore queries
+  final Map<String, String> _sessionCache = {};
   
   // Map of agent types to their IDs
   static const Map<String, String> _agentIds = {
@@ -20,6 +24,12 @@ class AIAgentService {
 
   // Method to get or create chat session for a user and agent
   Future<String> _getOrCreateChatSession(String userId, String agentType) async {
+    // Check the cache first
+    final cacheKey = '$userId:$agentType';
+    if (_sessionCache.containsKey(cacheKey)) {
+      return _sessionCache[cacheKey]!;
+    }
+    
     try {
       // Check if a session exists
       final sessionsRef = _firestore
@@ -34,7 +44,9 @@ class AIAgentService {
       
       // If session exists, return its ID
       if (sessions.docs.isNotEmpty) {
-        return sessions.docs.first.id;
+        final sessionId = sessions.docs.first.id;
+        _sessionCache[cacheKey] = sessionId; // Add to cache
+        return sessionId;
       }
       
       // Create a new session
@@ -52,6 +64,7 @@ class AIAgentService {
         }),
       );
       
+      _sessionCache[cacheKey] = newSessionRef.id; // Add to cache
       return newSessionRef.id;
     } catch (e) {
       print('Error getting/creating chat session: $e');
@@ -67,7 +80,22 @@ class AIAgentService {
         throw 'User not authenticated';
       }
       
-      // Get the session ID
+      // Start getting the AI response immediately
+      final responseCompleter = Completer<String>();
+      final aiResponseFuture = _geminiService.sendMessage(agentType, message);
+      
+      // Set up a timeout for AI response
+      aiResponseFuture.then((response) {
+        if (!responseCompleter.isCompleted) {
+          responseCompleter.complete(response);
+        }
+      }).catchError((e) {
+        if (!responseCompleter.isCompleted) {
+          responseCompleter.completeError(e);
+        }
+      });
+      
+      // Get the session ID (runs in parallel with AI request)
       final sessionId = await _getOrCreateChatSession(userId, agentType);
       
       // Get the agent ID
@@ -76,7 +104,7 @@ class AIAgentService {
         throw 'Invalid agent type';
       }
 
-      // Add user message to Firestore
+      // Add user message to Firestore (don't wait for completion)
       final messageRef = _firestore
           .collection('users')
           .doc(userId)
@@ -85,7 +113,8 @@ class AIAgentService {
           .collection('messages')
           .doc();
       
-      await RetryHelper.withRetry(
+      // Don't await this operation to reduce response time
+      RetryHelper.withRetry(
         operation: () => messageRef.set({
           'content': message,
           'isUser': true,
@@ -93,8 +122,8 @@ class AIAgentService {
         }),
       );
 
-      // Update the last updated timestamp of the session
-      await RetryHelper.withRetry(
+      // Update session timestamp (don't wait for completion)
+      RetryHelper.withRetry(
         operation: () => _firestore
             .collection('users')
             .doc(userId)
@@ -105,10 +134,10 @@ class AIAgentService {
             }),
       );
 
-      // Call Gemini API instead of Vertex AI
-      final response = await _geminiService.sendMessage(agentType, message);
+      // Wait for the AI response
+      final response = await responseCompleter.future;
       
-      // Add bot response to Firestore
+      // Add bot response to Firestore (don't wait for completion)
       final botMessageRef = _firestore
           .collection('users')
           .doc(userId)
@@ -117,7 +146,8 @@ class AIAgentService {
           .collection('messages')
           .doc();
       
-      await RetryHelper.withRetry(
+      // Don't await this operation to reduce response time
+      RetryHelper.withRetry(
         operation: () => botMessageRef.set({
           'content': response,
           'isUser': false,
@@ -224,6 +254,9 @@ class AIAgentService {
       
       // Get the session ID
       final sessionId = await _getOrCreateChatSession(userId, agentType);
+      
+      // Clear session cache
+      _sessionCache.remove('$userId:$agentType');
       
       // Get all messages from the session
       final messagesRef = _firestore

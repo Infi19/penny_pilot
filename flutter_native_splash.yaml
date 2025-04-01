@@ -1,13 +1,25 @@
 flutter_native_splash:
-  # Replace this with your desired background color
-  color: "#4b0082"
+  # Updated to match app theme primary color (dark navy blue)
+  color: "#222831"
   # Or use an image background
   # background_image: "assets/background.png"
   
-  # Your app logo
-  # image: assets/your_logo.png
+  # Your app logo - using the existing icon
+  image: assets/images/icon.png
   
   # Optional parameters
   android: true
   ios: true
   web: false 
+
+  # Icon background color (optional)
+  # Will be used as fallback if icon background is not available
+  icon_background_color: "#00ADB5"
+  
+  # The branding property allows you to specify an image to be displayed at the bottom of the splash screen
+  # branding: assets/branding.png
+  
+  # The position of the splash image can be set with android_gravity, ios_content_mode, and web_image_mode
+  android_gravity: center
+  ios_content_mode: center
+  web_image_mode: center 
