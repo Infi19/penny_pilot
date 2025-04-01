@@ -4,10 +4,14 @@ import 'profile_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'learn_screen.dart';
 import 'risk_assessment_screen.dart';
+import 'goal_details_screen.dart';
 import '../services/auth_service.dart';
 import '../services/risk_profile_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/risk_profile_model.dart';
+import '../utils/financial_goal_model.dart';
+import '../services/financial_goals_service.dart';
+import 'goals_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -75,26 +79,31 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   final RiskProfileService _riskService = RiskProfileService();
+  final FinancialGoalsService _goalsService = FinancialGoalsService();
   RiskProfile? _userRiskProfile;
+  List<FinancialGoal> _userGoals = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadRiskProfile();
+    _loadUserData();
   }
   
-  Future<void> _loadRiskProfile() async {
+  Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
         final profile = await _riskService.getRiskProfile(user.uid);
+        final goals = await _goalsService.getUserGoals();
+        
         setState(() {
           _userRiskProfile = profile;
+          _userGoals = goals;
           _isLoading = false;
         });
       } catch (e) {
-        print('Error loading risk profile: $e');
+        print('Error loading user data: $e');
         setState(() {
           _isLoading = false;
         });
@@ -113,7 +122,7 @@ class _HomeContentState extends State<HomeContent> {
       ),
     ).then((_) {
       // Reload risk profile when returning from assessment
-      _loadRiskProfile();
+      _loadUserData();
     });
   }
 
@@ -202,7 +211,12 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                       trailing: const Icon(Icons.arrow_forward, color: AppColors.lightest),
                       onTap: () {
-                        // Navigate to AI Assistant screen
+                        // Navigate directly to AI Assistant screen
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AIAssistantScreen(),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -298,6 +312,56 @@ class _HomeContentState extends State<HomeContent> {
                             TextButton(
                               onPressed: () {
                                 // Show all recommendations in detail view
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: AppColors.darkGrey,
+                                    title: const Text(
+                                      'All Recommendations',
+                                      style: TextStyle(color: AppColors.lightest),
+                                    ),
+                                    content: SingleChildScrollView(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: _userRiskProfile!.recommendations.map((recommendation) => 
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 16.0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Icon(
+                                                  Icons.lightbulb,
+                                                  color: AppColors.lightest,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    recommendation,
+                                                    style: const TextStyle(
+                                                      color: AppColors.lightest,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        ).toList(),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text(
+                                          'Close',
+                                          style: TextStyle(color: AppColors.lightest),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
                               },
                               child: const Text(
                                 'See All Recommendations',
@@ -312,6 +376,135 @@ class _HomeContentState extends State<HomeContent> {
                 ],
               ),
             ),
+
+            // Goals Section
+            if (_userGoals.isNotEmpty) ...[
+              Container(
+                color: AppColors.background,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Your Financial Goals',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.lightest,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const GoalsScreen(),
+                              ),
+                            ).then((_) => _loadUserData());
+                          },
+                          icon: const Icon(
+                            Icons.add,
+                            color: AppColors.mediumGrey,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'View All',
+                            style: TextStyle(
+                              color: AppColors.mediumGrey,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Show top 2 goals
+                    ..._userGoals.take(2).map((goal) => _buildGoalProgressCard(goal)).toList(),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Container(
+                color: AppColors.background,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Financial Goals',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.lightest,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Card(
+                      color: AppColors.darkGrey,
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.savings,
+                              color: AppColors.lightest,
+                              size: 40,
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Set Your Financial Goals',
+                              style: TextStyle(
+                                color: AppColors.lightest,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Create financial goals to track your progress and stay motivated towards achieving your financial objectives.',
+                              style: TextStyle(
+                                color: AppColors.lightGrey,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const GoalsScreen(),
+                                  ),
+                                ).then((_) => _loadUserData());
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.lightest,
+                                foregroundColor: AppColors.darkest,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text(
+                                'Create Goals',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -455,6 +648,189 @@ class _HomeContentState extends State<HomeContent> {
         return Colors.red;
       default:
         return AppColors.lightest;
+    }
+  }
+
+  Widget _buildGoalProgressCard(FinancialGoal goal) {
+    final progressPercentage = goal.progressPercentage;
+    final isCompleted = goal.isCompleted;
+    
+    return Card(
+      color: AppColors.darkGrey,
+      elevation: 4,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => GoalDetailsScreen(goal: goal),
+            ),
+          ).then((_) => _loadUserData());
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category Icon
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _getCategoryColor(goal.category).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _getCategoryIcon(goal.category),
+                      color: _getCategoryColor(goal.category),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Goal Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          goal.name,
+                          style: const TextStyle(
+                            color: AppColors.lightest,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '\$${goal.currentAmount.toStringAsFixed(0)} of \$${goal.targetAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: AppColors.lightGrey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Progress Percentage
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isCompleted
+                          ? Colors.green.withOpacity(0.2)
+                          : progressPercentage > 75
+                              ? Colors.orange.withOpacity(0.2)
+                              : AppColors.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${progressPercentage.toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: isCompleted
+                            ? Colors.green
+                            : progressPercentage > 75
+                                ? Colors.orange
+                                : AppColors.mediumGrey,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Progress Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0),
+                  backgroundColor: AppColors.darkest,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isCompleted
+                        ? Colors.green
+                        : progressPercentage > 75
+                            ? Colors.orange
+                            : AppColors.lightest,
+                  ),
+                  minHeight: 8,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Days remaining
+              if (!isCompleted)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: AppColors.lightGrey,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      goal.daysRemaining <= 0
+                          ? 'Past due'
+                          : goal.daysRemaining == 1
+                              ? '1 day left'
+                              : goal.daysRemaining < 30
+                                  ? '${goal.daysRemaining} days left'
+                                  : '${(goal.daysRemaining / 30).round()} months left',
+                      style: TextStyle(
+                        color: AppColors.lightGrey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Savings':
+        return Icons.savings;
+      case 'Retirement':
+        return Icons.beach_access;
+      case 'Emergency Fund':
+        return Icons.health_and_safety;
+      case 'Home':
+        return Icons.home;
+      case 'Education':
+        return Icons.school;
+      case 'Travel':
+        return Icons.flight;
+      case 'Car':
+        return Icons.directions_car;
+      default:
+        return Icons.attach_money;
+    }
+  }
+  
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Savings':
+        return Colors.blue;
+      case 'Retirement':
+        return Colors.purple;
+      case 'Emergency Fund':
+        return Colors.red;
+      case 'Home':
+        return Colors.green;
+      case 'Education':
+        return Colors.orange;
+      case 'Travel':
+        return Colors.teal;
+      case 'Car':
+        return Colors.indigo;
+      default:
+        return AppColors.primary;
     }
   }
 }
