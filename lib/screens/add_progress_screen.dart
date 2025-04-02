@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
 import '../utils/financial_goal_model.dart';
+import '../utils/currency_util.dart';
 import '../services/financial_goals_service.dart';
+import '../services/user_service.dart';
+import '../services/auth_service.dart';
 
 class AddProgressScreen extends StatefulWidget {
   final FinancialGoal goal;
@@ -19,6 +22,34 @@ class _AddProgressScreenState extends State<AddProgressScreen> {
   
   bool _isLoading = false;
   final FinancialGoalsService _goalsService = FinancialGoalsService();
+  final UserService _userService = UserService();
+  final AuthService _authService = AuthService();
+  String _currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+  String _currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserCurrency();
+  }
+
+  Future<void> _loadUserCurrency() async {
+    try {
+      final user = _authService.getCurrentUser();
+      if (user != null) {
+        final userData = await _userService.getUserProfile(user.uid);
+        if (userData != null && userData['currency'] != null) {
+          final currency = CurrencyUtil.getCurrencyData(userData['currency']);
+          setState(() {
+            _currencyCode = currency.code;
+            _currencySymbol = currency.symbol;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user currency: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -103,7 +134,7 @@ class _AddProgressScreenState extends State<AddProgressScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Current progress: \$${widget.goal.currentAmount.toStringAsFixed(2)} of \$${widget.goal.targetAmount.toStringAsFixed(2)} (${widget.goal.progressPercentage.toStringAsFixed(1)}%)',
+                              'Current progress: $_currencySymbol${widget.goal.currentAmount.toStringAsFixed(2)} of $_currencySymbol${widget.goal.targetAmount.toStringAsFixed(2)} (${widget.goal.progressPercentage.toStringAsFixed(1)}%)',
                               style: const TextStyle(
                                 color: AppColors.lightGrey,
                                 fontSize: 14,
@@ -129,14 +160,14 @@ class _AddProgressScreenState extends State<AddProgressScreen> {
                     TextFormField(
                       controller: _amountController,
                       style: const TextStyle(color: AppColors.lightest),
-                      decoration: const InputDecoration(
-                        labelText: 'Amount to Add (\$)',
-                        labelStyle: TextStyle(color: AppColors.lightGrey),
-                        border: OutlineInputBorder(),
-                        enabledBorder: OutlineInputBorder(
+                      decoration: InputDecoration(
+                        labelText: 'Amount to Add ($_currencySymbol)',
+                        labelStyle: const TextStyle(color: AppColors.lightGrey),
+                        border: const OutlineInputBorder(),
+                        enabledBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.mediumGrey),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.primary),
                         ),
                       ),
@@ -184,8 +215,8 @@ class _AddProgressScreenState extends State<AddProgressScreen> {
                       child: ElevatedButton(
                         onPressed: _saveProgress,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.darkest,
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: AppColors.white,
                         ),
                         child: const Text(
                           'Add Progress',

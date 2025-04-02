@@ -5,7 +5,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/currency_util.dart';
 import 'login_screen.dart';
+import 'financial_health_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -26,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _userData;
   File? _selectedImage;
+  String _selectedCurrency = CurrencyUtil.getDefaultCurrencyCode();
 
   @override
   void initState() {
@@ -55,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _nameController.text = userData?['displayName'] ?? user.displayName ?? '';
           _phoneController.text = userData?['phone'] ?? '';
           _bioController.text = userData?['bio'] ?? '';
+          _selectedCurrency = userData?['currency'] ?? CurrencyUtil.getDefaultCurrencyCode();
           _isLoading = false;
         });
       } catch (e) {
@@ -103,6 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'phone': _phoneController.text,
             'bio': _bioController.text,
             'photoURL': photoURL,
+            'currency': _selectedCurrency,
             'lastUpdated': DateTime.now().toIso8601String(),
           });
 
@@ -414,6 +419,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Divider(color: AppColors.darkGrey),
 
                     const SizedBox(height: 30),
+
+                    // Currency
+                    ListTile(
+                      leading: const Icon(Icons.currency_exchange, color: AppColors.mediumGrey),
+                      title: const Text('Currency', style: TextStyle(color: AppColors.lightest)),
+                      subtitle: _isEditing
+                          ? DropdownButton<String>(
+                              value: _selectedCurrency,
+                              dropdownColor: AppColors.darkGrey,
+                              isExpanded: true,
+                              underline: Container(
+                                height: 1,
+                                color: AppColors.mediumGrey,
+                              ),
+                              style: const TextStyle(color: AppColors.lightest),
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _selectedCurrency = newValue;
+                                  });
+                                }
+                              },
+                              items: CurrencyUtil.getCurrencyDropdownItems(),
+                            )
+                          : Row(
+                              children: [
+                                Text(
+                                  CurrencyUtil.getCurrencyData(_selectedCurrency).flag + ' ',
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                Text(
+                                  _selectedCurrency + ' - ' + 
+                                  CurrencyUtil.getCurrencyData(_selectedCurrency).symbol,
+                                  style: const TextStyle(color: AppColors.lightGrey),
+                                ),
+                              ],
+                            ),
+                    ),
+                    Divider(color: AppColors.darkGrey),
+
+                    // Financial Health Calculator
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FinancialHealthScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.darkGrey,
+                          foregroundColor: AppColors.lightest,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Financial Health Calculator'),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 15),
 
                     // Logout Button
                     SizedBox(

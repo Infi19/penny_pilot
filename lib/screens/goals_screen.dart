@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../utils/financial_goal_model.dart';
+import '../utils/currency_util.dart';
 import '../services/financial_goals_service.dart';
+import '../services/user_service.dart';
+import '../services/auth_service.dart';
 import 'add_edit_goal_screen.dart';
 import 'goal_details_screen.dart';
 
@@ -15,30 +18,50 @@ class GoalsScreen extends StatefulWidget {
 
 class _GoalsScreenState extends State<GoalsScreen> {
   final FinancialGoalsService _goalsService = FinancialGoalsService();
+  final UserService _userService = UserService();
+  final AuthService _authService = AuthService();
   List<FinancialGoal> _goals = [];
   bool _isLoading = true;
+  String _currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+  String _currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
   
   @override
   void initState() {
     super.initState();
-    _loadGoals();
+    _loadData();
   }
   
-  Future<void> _loadGoals() async {
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
+      // Load user currency preference
+      final user = _authService.getCurrentUser();
+      if (user != null) {
+        final userData = await _userService.getUserProfile(user.uid);
+        if (userData != null && userData['currency'] != null) {
+          final currency = CurrencyUtil.getCurrencyData(userData['currency']);
+          _currencyCode = currency.code;
+          _currencySymbol = currency.symbol;
+        }
+      }
+      
+      // Load goals
       final goals = await _goalsService.getUserGoals();
       setState(() {
         _goals = goals;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading goals: $e');
+      print('Error loading data: $e');
       setState(() {
         _isLoading = false;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading goals: $e')),
+          SnackBar(content: Text('Error loading data: $e')),
         );
       }
     }
@@ -52,7 +75,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
     
     if (result == true) {
-      await _loadGoals();
+      await _loadData();
     }
   }
   
@@ -64,7 +87,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
     
     if (result == true) {
-      await _loadGoals();
+      await _loadData();
     }
   }
   
@@ -82,13 +105,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToAddGoal,
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
+        backgroundColor: AppColors.secondary,
+        child: const Icon(Icons.add,color: AppColors.white,),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadGoals,
+              onRefresh: _loadData,
               child: _goals.isEmpty
                   ? _buildEmptyState()
                   : ListView.builder(
@@ -133,11 +156,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _navigateToAddGoal,
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add,color: AppColors.mediumGrey,),
             label: const Text('Add New Goal'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.mediumGrey,
+              backgroundColor: AppColors.secondary,
+              foregroundColor: AppColors.white,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,
@@ -150,7 +173,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
   
   Widget _buildGoalCard(FinancialGoal goal) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: _currencySymbol, decimalDigits: 0);
     final isCompleted = goal.isCompleted;
     final daysLeft = goal.daysRemaining;
     
@@ -276,7 +299,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       value: (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0),
                       backgroundColor: AppColors.darkest,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        isCompleted ? Colors.green : AppColors.primary,
+                        isCompleted
+                           ? Colors.green
+                           : goal.progressPercentage > 75
+                             ? Colors.orange
+                             : AppColors.lightest,
                       ),
                       minHeight: 8,
                     ),

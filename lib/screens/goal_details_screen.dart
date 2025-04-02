@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../utils/financial_goal_model.dart';
+import '../utils/currency_util.dart';
 import '../services/financial_goals_service.dart';
+import '../services/user_service.dart';
+import '../services/auth_service.dart';
 import 'add_progress_screen.dart';
 import 'add_edit_goal_screen.dart';
 
@@ -18,12 +21,35 @@ class GoalDetailsScreen extends StatefulWidget {
 class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
   late FinancialGoal _goal;
   final FinancialGoalsService _goalsService = FinancialGoalsService();
+  final UserService _userService = UserService();
+  final AuthService _authService = AuthService();
   bool _isLoading = false;
+  String _currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+  String _currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
 
   @override
   void initState() {
     super.initState();
     _goal = widget.goal;
+    _loadUserCurrency();
+  }
+  
+  Future<void> _loadUserCurrency() async {
+    try {
+      final user = _authService.getCurrentUser();
+      if (user != null) {
+        final userData = await _userService.getUserProfile(user.uid);
+        if (userData != null && userData['currency'] != null) {
+          final currency = CurrencyUtil.getCurrencyData(userData['currency']);
+          setState(() {
+            _currencyCode = currency.code;
+            _currencySymbol = currency.symbol;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user currency: $e');
+    }
   }
 
   Future<void> _refreshGoal() async {
@@ -139,7 +165,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final currencyFormat = NumberFormat.currency(symbol: _currencySymbol, decimalDigits: 2);
     final monthlyContribution = _goal.monthlyContributionNeeded;
     final isCompleted = _goal.isCompleted;
     final daysRemaining = _goal.daysRemaining;
@@ -173,8 +199,8 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
       floatingActionButton: !isCompleted
           ? FloatingActionButton(
               onPressed: _navigateToAddProgress,
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.add),
+              backgroundColor: AppColors.secondary,
+              child: const Icon(Icons.add,color: AppColors.white,),
             )
           : null,
       body: _isLoading

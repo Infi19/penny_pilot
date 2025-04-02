@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../utils/financial_goal_model.dart';
+import '../utils/currency_util.dart';
 import '../services/financial_goals_service.dart';
+import '../services/user_service.dart';
+import '../services/auth_service.dart';
 
 class AddEditGoalScreen extends StatefulWidget {
   final FinancialGoal? goal; // Null for creating a new goal
@@ -36,10 +39,15 @@ class _AddEditGoalScreenState extends State<AddEditGoalScreen> {
   
   bool _isLoading = false;
   final FinancialGoalsService _goalsService = FinancialGoalsService();
+  final UserService _userService = UserService();
+  final AuthService _authService = AuthService();
+  String _currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+  String _currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
 
   @override
   void initState() {
     super.initState();
+    _loadUserCurrency();
     
     // If editing an existing goal, populate the form
     if (widget.goal != null) {
@@ -156,6 +164,24 @@ class _AddEditGoalScreenState extends State<AddEditGoalScreen> {
     }
   }
 
+  Future<void> _loadUserCurrency() async {
+    try {
+      final user = _authService.getCurrentUser();
+      if (user != null) {
+        final userData = await _userService.getUserProfile(user.uid);
+        if (userData != null && userData['currency'] != null) {
+          final currency = CurrencyUtil.getCurrencyData(userData['currency']);
+          setState(() {
+            _currencyCode = currency.code;
+            _currencySymbol = currency.symbol;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user currency: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -237,16 +263,17 @@ class _AddEditGoalScreenState extends State<AddEditGoalScreen> {
                     TextFormField(
                       controller: _targetAmountController,
                       style: const TextStyle(color: AppColors.lightest),
-                      decoration: const InputDecoration(
-                        labelText: 'Target Amount (\$)',
-                        labelStyle: TextStyle(color: AppColors.lightGrey),
-                        border: OutlineInputBorder(),
-                        enabledBorder: OutlineInputBorder(
+                      decoration: InputDecoration(
+                        labelText: 'Target Amount ($_currencySymbol)',
+                        labelStyle: const TextStyle(color: AppColors.lightGrey),
+                        border: const OutlineInputBorder(),
+                        enabledBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.mediumGrey),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.primary),
                         ),
+                        prefixText: _currencySymbol + ' ',
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {
@@ -262,22 +289,23 @@ class _AddEditGoalScreenState extends State<AddEditGoalScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     
                     // Current Amount
                     TextFormField(
                       controller: _currentAmountController,
                       style: const TextStyle(color: AppColors.lightest),
-                      decoration: const InputDecoration(
-                        labelText: 'Current Amount (\$)',
-                        labelStyle: TextStyle(color: AppColors.lightGrey),
-                        border: OutlineInputBorder(),
-                        enabledBorder: OutlineInputBorder(
+                      decoration: InputDecoration(
+                        labelText: 'Current Amount ($_currencySymbol)',
+                        labelStyle: const TextStyle(color: AppColors.lightGrey),
+                        border: const OutlineInputBorder(),
+                        enabledBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.mediumGrey),
                         ),
-                        focusedBorder: OutlineInputBorder(
+                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: AppColors.primary),
                         ),
+                        prefixText: _currencySymbol + ' ',
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {
@@ -347,8 +375,8 @@ class _AddEditGoalScreenState extends State<AddEditGoalScreen> {
                       child: ElevatedButton(
                         onPressed: _saveGoal,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.mediumGrey,
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: AppColors.white,
                         ),
                         child: Text(
                           widget.goal == null ? 'Create Goal' : 'Update Goal',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'profile_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'learn_screen.dart';
@@ -10,8 +11,14 @@ import '../services/risk_profile_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/risk_profile_model.dart';
 import '../utils/financial_goal_model.dart';
+import '../utils/financial_health_model.dart';
 import '../services/financial_goals_service.dart';
+import '../services/financial_health_service.dart';
 import 'goals_screen.dart';
+import 'financial_health_screen.dart';
+import '../services/user_service.dart';
+import '../utils/currency_util.dart';
+import 'financial_health_result_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -80,9 +87,14 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   final RiskProfileService _riskService = RiskProfileService();
   final FinancialGoalsService _goalsService = FinancialGoalsService();
+  final FinancialHealthService _healthService = FinancialHealthService();
+  final UserService _userService = UserService();
   RiskProfile? _userRiskProfile;
   List<FinancialGoal> _userGoals = [];
+  FinancialHealthScore? _healthScore;
   bool _isLoading = true;
+  String _currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+  String _currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
 
   @override
   void initState() {
@@ -96,10 +108,28 @@ class _HomeContentState extends State<HomeContent> {
       try {
         final profile = await _riskService.getRiskProfile(user.uid);
         final goals = await _goalsService.getUserGoals();
+        final healthScore = await _healthService.getLatestHealthScore();
+        
+        // Load user currency preference
+        final userData = await _userService.getUserProfile(user.uid);
+        String currencyCode = CurrencyUtil.getDefaultCurrencyCode();
+        String currencySymbol = CurrencyUtil.getDefaultCurrency().symbol;
+        
+        if (userData != null && userData['currency'] != null) {
+          final currency = CurrencyUtil.getCurrencyData(userData['currency']);
+          currencyCode = currency.code;
+          currencySymbol = currency.symbol;
+        }
+        
+        // Sort goals by days remaining in ascending order
+        goals.sort((a, b) => a.daysRemaining.compareTo(b.daysRemaining));
         
         setState(() {
           _userRiskProfile = profile;
           _userGoals = goals;
+          _healthScore = healthScore;
+          _currencyCode = currencyCode;
+          _currencySymbol = currencySymbol;
           _isLoading = false;
         });
       } catch (e) {
@@ -124,6 +154,27 @@ class _HomeContentState extends State<HomeContent> {
       // Reload risk profile when returning from assessment
       _loadUserData();
     });
+  }
+
+  void _navigateToFinancialHealthScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const FinancialHealthScreen(),
+      ),
+    ).then((_) {
+      // Reload financial health score when returning from assessment
+      _loadUserData();
+    });
+  }
+
+  void _navigateToFinancialHealthResultScreen() {
+    if (_healthScore != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => FinancialHealthResultScreen(scoreId: _healthScore!.id),
+        ),
+      );
+    }
   }
 
   @override
@@ -262,6 +313,40 @@ class _HomeContentState extends State<HomeContent> {
                       : _userRiskProfile == null
                           ? _buildNoProfileCard()
                           : _buildRiskProfileCard(),
+                  const SizedBox(height: 20),
+
+                  // Financial Health Score Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Financial Health',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.lightest,
+                        ),
+                      ),
+                      _healthScore != null
+                          ? TextButton.icon(
+                              onPressed: _navigateToFinancialHealthScreen,
+                              icon: const Icon(
+                                Icons.refresh,
+                                color: AppColors.mediumGrey,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Recalculate',
+                                style: TextStyle(
+                                  color: AppColors.mediumGrey,
+                                ),
+                              ),
+                            )
+                          : Container(),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _buildFinancialHealthCard(),
                   const SizedBox(height: 20),
 
                   // Recommendations Section (only if profile exists)
@@ -420,8 +505,10 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Show top 2 goals
-                    ..._userGoals.take(2).map((goal) => _buildGoalProgressCard(goal)).toList(),
+                    // Show only the top 1 goal with the nearest end date
+                    _userGoals.isNotEmpty 
+                      ? _buildGoalProgressCard(_userGoals.first)
+                      : Container(),
                   ],
                 ),
               ),
@@ -651,6 +738,191 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Widget _buildFinancialHealthCard() {
+    if (_healthScore == null) {
+      return Card(
+        color: AppColors.darkGrey,
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.health_and_safety,
+                color: AppColors.lightest,
+                size: 40,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Calculate Your Financial Health',
+                style: TextStyle(
+                  color: AppColors.lightest,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Get a comprehensive assessment of your financial well-being based on key financial metrics.',
+                style: TextStyle(
+                  color: AppColors.lightGrey,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _navigateToFinancialHealthScreen,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.lightest,
+                  foregroundColor: AppColors.darkest,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                ),
+                child: const Text(
+                  'Calculate Now',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Color scoreColor;
+    switch (_healthScore!.healthCategory) {
+      case 'Excellent':
+        scoreColor = Colors.green;
+        break;
+      case 'Good':
+        scoreColor = Colors.yellow;
+        break;
+      case 'Moderate Risk':
+        scoreColor = Colors.orange;
+        break;
+      case 'High Risk':
+        scoreColor = Colors.red;
+        break;
+      default:
+        scoreColor = Colors.grey;
+    }
+
+    return Card(
+      color: AppColors.darkGrey,
+      elevation: 4,
+      child: InkWell(
+        onTap: _navigateToFinancialHealthResultScreen,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Financial Health Score',
+                    style: TextStyle(
+                      color: AppColors.lightest,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scoreColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _healthScore!.totalScore.toStringAsFixed(0),
+                      style: TextStyle(
+                        color: scoreColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                value: _healthScore!.totalScore / 100,
+                backgroundColor: Colors.grey.withOpacity(0.3),
+                valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+                minHeight: 10,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _healthScore!.healthCategory,
+                    style: TextStyle(
+                      color: scoreColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Updated: ${DateFormat.yMMMd().format(_healthScore!.assessmentDate)}',
+                    style: const TextStyle(
+                      color: AppColors.lightGrey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_healthScore!.recommendations.isNotEmpty)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.lightbulb,
+                      color: AppColors.lightest,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _healthScore!.recommendations.first,
+                        style: const TextStyle(
+                          color: AppColors.lightest,
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 8),
+              const Center(
+                child: Text(
+                  'Tap to view detailed breakdown',
+                  style: TextStyle(
+                    color: AppColors.mediumGrey,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGoalProgressCard(FinancialGoal goal) {
     final progressPercentage = goal.progressPercentage;
     final isCompleted = goal.isCompleted;
@@ -704,7 +976,7 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                         Text(
-                          '\$${goal.currentAmount.toStringAsFixed(0)} of \$${goal.targetAmount.toStringAsFixed(0)}',
+                          '$_currencySymbol${goal.currentAmount.toStringAsFixed(0)} of $_currencySymbol${goal.targetAmount.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: AppColors.lightGrey,
                             fontSize: 14,
