@@ -18,11 +18,12 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
   final Map<String, UniqueKey> _chatKeys = {};
   final List<AgentInfo> _agents = [
     AgentInfo(
-      name: 'Finance Expert',
-      type: 'finance',
-      icon: Icons.attach_money,
-      color: Colors.green,
-      description: 'Get personalized investment advice and financial insights',
+      name: 'Smart Finance Advisor',
+      type: 'personal',
+      icon: Icons.auto_awesome,
+      color: Colors.deepPurple,
+      description: 'Get personalized advice based on your profile and expert financial insights',
+      isPrimary: true,
     ),
     AgentInfo(
       name: 'Fraud Detective',
@@ -54,6 +55,11 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
     for (final agent in _agents) {
       _chatKeys[agent.type] = UniqueKey();
     }
+    
+    // Start with the primary agent (Smart Finance Advisor) selected
+    _tabController.animateTo(_agents.indexWhere((agent) => agent.isPrimary) != -1 
+                              ? _agents.indexWhere((agent) => agent.isPrimary) 
+                              : 0);
   }
 
   @override
@@ -172,9 +178,13 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        elevation: 0,
         title: const Text(
           'AI Assistant',
-          style: TextStyle(color: AppColors.lightest),
+          style: TextStyle(
+            color: AppColors.lightest,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: AppColors.darkGrey,
         iconTheme: const IconThemeData(color: AppColors.lightest),
@@ -195,6 +205,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.lightGrey,
+          isScrollable: true, // Allow scrolling if there are many tabs
           tabs: _agents.map((agent) => Tab(
             icon: Icon(agent.icon),
             text: agent.name,
@@ -211,59 +222,32 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
   Widget _buildAgentTab(AgentInfo agent) {
     return Column(
       children: [
-        // Agent description bar
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: agent.color.withOpacity(0.1),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: agent.color,
-                child: Icon(
-                  agent.icon,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      agent.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.lightest,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      agent.description,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.lightGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Chat UI with key for rebuild
+        // Chat UI
         Expanded(
           child: ChatUI(
             key: _chatKeys[agent.type],
             agentType: agent.type,
-            agentName: agent.name,
-            agentIcon: agent.icon,
-            agentColor: agent.color,
+            aiService: _aiAgentService,
+            placeholderText: _getPlaceholderText(agent.type),
           ),
         ),
       ],
     );
+  }
+  
+  String _getPlaceholderText(String agentType) {
+    switch (agentType) {
+      case 'personal':
+        return 'Ask about investment concepts or for personalized financial advice...';
+      case 'fraud':
+        return 'Ask about financial scams and fraud protection...';
+      case 'mythbusting':
+        return 'Ask about financial myths and misconceptions...';
+      case 'roadmap':
+        return 'Ask for guidance on your financial journey...';
+      default:
+        return 'Type your message here...';
+    }
   }
 }
 
@@ -273,6 +257,7 @@ class AgentInfo {
   final IconData icon;
   final Color color;
   final String description;
+  final bool isPrimary;
 
   AgentInfo({
     required this.name,
@@ -280,5 +265,6 @@ class AgentInfo {
     required this.icon,
     required this.color,
     required this.description,
+    this.isPrimary = false,
   });
 } 

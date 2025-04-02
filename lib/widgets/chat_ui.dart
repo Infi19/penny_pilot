@@ -8,16 +8,14 @@ import '../services/ai_agent_service.dart';
 
 class ChatUI extends StatefulWidget {
   final String agentType;
-  final String agentName;
-  final IconData agentIcon;
-  final Color agentColor;
+  final AIAgentService aiService;
+  final String placeholderText;
 
   const ChatUI({
     Key? key,
     required this.agentType,
-    required this.agentName,
-    required this.agentIcon,
-    required this.agentColor,
+    required this.aiService,
+    this.placeholderText = 'Type your message here...',
   }) : super(key: key);
 
   @override
@@ -25,7 +23,6 @@ class ChatUI extends StatefulWidget {
 }
 
 class _ChatUIState extends State<ChatUI> {
-  final AIAgentService _aiAgentService = AIAgentService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
@@ -54,7 +51,8 @@ class _ChatUIState extends State<ChatUI> {
     });
 
     try {
-      final history = await _aiAgentService.getChatHistory(widget.agentType);
+      // Limit initial history load to 15 messages for faster startup
+      final history = await widget.aiService.getChatHistory(widget.agentType, limit: 15);
       setState(() {
         _messages = history.map((message) => ChatMessage(
           id: message['id'],
@@ -64,9 +62,8 @@ class _ChatUIState extends State<ChatUI> {
         )).toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading chat history: $e')),
-      );
+      // Silent error handling for better UX
+      print('Error loading chat history: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -78,7 +75,7 @@ class _ChatUIState extends State<ChatUI> {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
-    // Clear text field
+    // Clear text field immediately for better UX
     _messageController.clear();
 
     // Generate a unique ID for this message
@@ -92,12 +89,13 @@ class _ChatUIState extends State<ChatUI> {
       timestamp: DateTime.now(),
     );
 
+    // Optimistic UI update
     setState(() {
       _messages.add(userMessage);
       _isLoading = true;
     });
 
-    // Scroll to bottom
+    // Scroll to bottom immediately
     _scrollToBottom();
 
     try {
@@ -120,28 +118,60 @@ class _ChatUIState extends State<ChatUI> {
       // Scroll to show the placeholder
       _scrollToBottom();
       
-      // Send message to agent
-      final response = await _aiAgentService.sendMessage(widget.agentType, message);
+      // Send message to agent with timeout
+      final response = await widget.aiService.sendMessage(widget.agentType, message)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => {
+              'sessionId': '',
+              'response': 'Response is taking longer than expected. Please try again with a simpler question.'
+            },
+          );
       
       // Start streaming the response
-      _startStreamingResponse(placeholderId, response['response']);
+      _startFastStreamingResponse(placeholderId, response['response']);
       
     } catch (e) {
+      // Clean UI error recovery
       setState(() {
         // Remove placeholder if exists
         _messages.removeWhere((msg) => msg.id.endsWith('-response') && msg.content == "...");
         _isLoading = false;
+        
+        // Add error message for better UX
+        _messages.add(ChatMessage(
+          id: '$messageId-error',
+          content: "Sorry, there was a problem. Please try again.",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending message: $e')),
-      );
+      _scrollToBottom();
     }
   }
   
-  void _startStreamingResponse(String messageId, String fullResponse) {
+  void _startFastStreamingResponse(String messageId, String fullResponse) {
     // Cancel any existing streaming
     _cancelStreaming();
+    
+    // Skip streaming for very short responses (show immediately)
+    if (fullResponse.length < 80) {
+      setState(() {
+        final index = _messages.indexWhere((msg) => msg.id == messageId);
+        if (index != -1) {
+          _messages[index] = ChatMessage(
+            id: messageId,
+            content: fullResponse,
+            isUser: false,
+            timestamp: DateTime.now(),
+          );
+        }
+        _isLoading = false;
+      });
+      _scrollToBottom();
+      return;
+    }
     
     // Initialize streaming variables
     _completeResponse = fullResponse;
@@ -162,17 +192,29 @@ class _ChatUIState extends State<ChatUI> {
       });
     }
     
-    _continueStreamingText(messageId);
+    // Use faster streaming for long responses
+    _fastStreamingText(messageId);
   }
   
-  void _continueStreamingText(String messageId) {
-    // Set up timer to stream response character by character
-    // Vary the speed based on punctuation for more natural typing
-    _streamTimer = Timer.periodic(const Duration(milliseconds: 15), (timer) {
-      if (_currentTextPosition < _completeResponse.length) {
-        // Add one character at a time
-        _currentTextPosition++;
-        _currentlyDisplayedText = _completeResponse.substring(0, _currentTextPosition);
+  void _fastStreamingText(String messageId) {
+    // Stream by chunks instead of characters for better performance
+    final int responseLength = _completeResponse.length;
+    final int chunks = responseLength ~/ 20; // Divide into ~20 chunks
+    final int chunkSize = responseLength ~/ chunks;
+    
+    int currentChunk = 0;
+    
+    // Set up timer to stream response in chunks
+    _streamTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (currentChunk < chunks) {
+        currentChunk++;
+        
+        // Calculate end position (don't exceed string length)
+        final endPos = (currentChunk * chunkSize < responseLength) 
+            ? currentChunk * chunkSize 
+            : responseLength;
+            
+        _currentlyDisplayedText = _completeResponse.substring(0, endPos);
         
         // Update the message with new text
         final index = _messages.indexWhere((msg) => msg.id == messageId);
@@ -187,25 +229,30 @@ class _ChatUIState extends State<ChatUI> {
           });
         }
         
-        // Add a small pause after punctuation marks
-        final currentChar = _completeResponse[_currentTextPosition - 1];
-        if (['.', '!', '?', ',', ';', ':'].contains(currentChar)) {
-          timer.cancel();
-          Future.delayed(Duration(milliseconds: currentChar == ',' ? 150 : 300), () {
-            if (_isStreaming) {
-              _continueStreamingText(messageId);
-            }
-          });
-        }
-        
         // Scroll to show new content
         _scrollToBottom();
       } else {
+        // Show full response
+        final index = _messages.indexWhere((msg) => msg.id == messageId);
+        if (index != -1) {
+          setState(() {
+            _messages[index] = ChatMessage(
+              id: messageId,
+              content: _completeResponse,
+              isUser: false,
+              timestamp: DateTime.now(),
+            );
+          });
+        }
+        
         // Streaming complete
         _cancelStreaming();
         setState(() {
           _isLoading = false;
         });
+        
+        // Final scroll
+        _scrollToBottom();
       }
     });
   }
@@ -230,7 +277,7 @@ class _ChatUIState extends State<ChatUI> {
 
   Future<void> _deleteMessage(String messageId) async {
     try {
-      await _aiAgentService.deleteMessage(widget.agentType, messageId);
+      await widget.aiService.deleteMessage(widget.agentType, messageId);
       setState(() {
         _messages.removeWhere((message) => message.id == messageId);
       });
@@ -257,70 +304,208 @@ class _ChatUIState extends State<ChatUI> {
       children: [
         Expanded(
           child: _isLoading && _messages.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                )
               : _messages.isEmpty
-                  ? _buildEmptyState()
-                  : _buildChatList(),
+                  ? _buildWelcomeMessage()
+                  : _buildChatMessages(),
         ),
-        _buildInputField(),
+        _buildInputArea(),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            widget.agentIcon,
-            size: 80,
-            color: widget.agentColor.withOpacity(0.7),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Start a conversation with ${widget.agentName}',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.lightGrey,
+  Widget _buildWelcomeMessage() {
+    String welcomeMessage = 'Hello! How can I help you with your finances today?';
+    String hintText = 'Try asking questions about...';
+    List<String> suggestions = [];
+    String agentName = '';
+    
+    if (widget.agentType == 'personal') {
+      agentName = 'Smart Finance Advisor';
+      welcomeMessage = 'Hello! I\'m your Smart Finance Advisor. I combine personalized advice with expert financial knowledge.';
+      hintText = 'I can help with:';
+      suggestions = [
+        'Personal advice based on your financial profile, goals, and risk tolerance',
+        'Expert insights on investment options and strategies',
+        'Financial concept explanations and market terminology',
+        'Personalized investment recommendations',
+        'Try asking: "What investment mix suits my risk profile?"',
+        'Try asking: "Explain mutual funds and which ones match my goals"',
+        'Try asking: "How can I optimize my portfolio given my financial health?"',
+      ];
+    } else if (widget.agentType == 'fraud') {
+      agentName = 'Fraud Detective';
+      welcomeMessage = 'Hello! I\'m your Fraud Detective. I can help you identify and avoid financial scams.';
+      suggestions = [
+        'How to identify scams',
+        'Common fraud schemes',
+        'How to protect yourself',
+        'What to do if you\'ve been scammed',
+      ];
+    } else if (widget.agentType == 'mythbusting') {
+      agentName = 'Financial Myth Buster';
+      welcomeMessage = 'Hello! I\'m your Financial Myth Buster. I can help debunk financial misconceptions.';
+      suggestions = [
+        'Common financial myths',
+        'Fact checking investment advice',
+        'Truth behind financial advice',
+        'Separating fact from fiction',
+      ];
+    } else if (widget.agentType == 'roadmap') {
+      agentName = 'Roadmap Guide';
+      welcomeMessage = 'Hello! I\'m your Roadmap Guide. I can help create a financial plan to reach your goals.';
+      suggestions = [
+        'Building a financial plan',
+        'Setting realistic timelines',
+        'Prioritizing financial goals',
+        'Adjusting plans as circumstances change',
+      ];
+    }
+    
+    return SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20),
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: _getAgentColor(),
+              child: Icon(
+                _getAgentIcon(),
+                size: 50,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              agentName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.lightest,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              welcomeMessage,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.lightest,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            Text(
+              hintText,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.lightGrey,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...suggestions.map((suggestion) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                '• $suggestion',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.lightGrey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            )),
+            const SizedBox(height: 20), // Add extra padding at the bottom
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildChatList() {
+  IconData _getAgentIcon() {
+    switch (widget.agentType) {
+      case 'personal': return Icons.auto_awesome;
+      case 'fraud': return Icons.security;
+      case 'mythbusting': return Icons.lightbulb;
+      case 'roadmap': return Icons.map;
+      default: return Icons.chat;
+    }
+  }
+
+  Color _getAgentColor() {
+    switch (widget.agentType) {
+      case 'personal': return Colors.deepPurple;
+      case 'fraud': return Colors.red;
+      case 'mythbusting': return Colors.amber;
+      case 'roadmap': return Colors.blue;
+      default: return AppColors.primary;
+    }
+  }
+
+  Widget _buildChatMessages() {
     return ListView.builder(
-      key: PageStorageKey('chat_messages'),
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
-      itemCount: _messages.length + (_isLoading ? 1 : 0),
+      padding: const EdgeInsets.all(8),
+      itemCount: _messages.length,
       itemBuilder: (context, index) {
-        if (index == _messages.length) {
-          return _buildLoadingIndicator();
-        }
-        
         final message = _messages[index];
         return _buildMessageBubble(message);
       },
-      // Add cacheExtent for better scrolling performance
-      cacheExtent: 1000,
+      // Performance optimizations
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: false,
+      addSemanticIndexes: false,
     );
   }
 
-  Widget _buildLoadingIndicator() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(widget.agentColor),
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      color: AppColors.darkGrey,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              style: const TextStyle(color: AppColors.lightest),
+              decoration: InputDecoration(
+                hintText: widget.placeholderText,
+                hintStyle: const TextStyle(color: AppColors.lightGrey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25.0),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: AppColors.darkest,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              keyboardType: TextInputType.text,
+              textCapitalization: TextCapitalization.sentences,
+              onSubmitted: (_) => _sendMessage(),
+            ),
           ),
-        ),
+          const SizedBox(width: 8),
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(
+                _isLoading ? Icons.sync : Icons.send,
+                color: Colors.white,
+              ),
+              onPressed: _isLoading ? null : _sendMessage,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -353,7 +538,7 @@ class _ChatUIState extends State<ChatUI> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(widget.agentColor),
+                        valueColor: AlwaysStoppedAnimation<Color>(_getAgentColor()),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -435,9 +620,9 @@ class _ChatUIState extends State<ChatUI> {
   Widget _buildAgentAvatar() {
     return CircleAvatar(
       radius: 16,
-      backgroundColor: widget.agentColor,
+      backgroundColor: _getAgentColor(),
       child: Icon(
-        widget.agentIcon,
+        _getAgentIcon(),
         size: 16,
         color: Colors.white,
       ),
@@ -452,51 +637,6 @@ class _ChatUIState extends State<ChatUI> {
         Icons.person,
         size: 16,
         color: Colors.white,
-      ),
-    );
-  }
-
-  Widget _buildInputField() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.darkGrey,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: 'Type your message...',
-                hintStyle: TextStyle(color: AppColors.lightGrey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: AppColors.background,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              style: TextStyle(color: AppColors.lightest),
-              onSubmitted: (_) => _sendMessage(),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FloatingActionButton(
-            mini: true,
-            backgroundColor: widget.agentColor,
-            onPressed: _sendMessage,
-            child: const Icon(Icons.send),
-          ),
-        ],
       ),
     );
   }

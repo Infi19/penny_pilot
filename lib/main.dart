@@ -8,17 +8,44 @@ import 'screens/home_screen.dart';
 import 'screens/launch_screen.dart';
 import 'package:firebase_vertexai/firebase_vertexai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'services/gemini_service.dart';
+import 'services/personalized_advice_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables from .env file
-  await dotenv.load();
+  // Load environment variables
+  await dotenv.load(fileName: '.env');
   
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize services
+  await initServices();
+  
   runApp(const MyApp());
+}
+
+Future<void> initServices() async {
+  // Initialize shared preferences
+  await SharedPreferences.getInstance();
+  
+  // Pre-initialize singletons for faster app startup
+  GeminiService(); // This initializes the GeminiService singleton
+  
+  // Ensure AI personalization is ready by pre-warming
+  if (FirebaseAuth.instance.currentUser != null) {
+    try {
+      final personalizedAdviceService = PersonalizedAdviceService();
+      // Prefetch user context in background
+      personalizedAdviceService.getUserFinancialContext();
+    } catch (e) {
+      print('Error pre-initializing AI personalization: $e');
+    }
+  }
 }
 
 class MyApp extends StatelessWidget {

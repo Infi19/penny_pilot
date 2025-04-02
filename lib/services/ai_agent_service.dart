@@ -4,19 +4,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/retry_helper.dart';
 import 'gemini_service.dart';
+import 'personalized_advice_service.dart';
 import 'dart:async';
 
 class AIAgentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GeminiService _geminiService = GeminiService();
+  final PersonalizedAdviceService _personalizedAdviceService = PersonalizedAdviceService();
   
   // Cache session IDs to avoid repeated Firestore queries
   final Map<String, String> _sessionCache = {};
   
   // Map of agent types to their IDs
   static const Map<String, String> _agentIds = {
-    'finance': 'finance_agent',
+    'personal': 'smart_finance_advisor', // Updated to combine personal and finance
     'fraud': 'fraud_agent',
     'mythbusting': 'mythbusting_agent',
     'roadmap': 'roadmap_agent',
@@ -80,23 +82,50 @@ class AIAgentService {
         throw 'User not authenticated';
       }
       
+      // Create a session ID even before starting the AI request
+      final sessionIdFuture = _getOrCreateChatSession(userId, agentType);
+      
       // Start getting the AI response immediately
       final responseCompleter = Completer<String>();
-      final aiResponseFuture = _geminiService.sendMessage(agentType, message);
       
-      // Set up a timeout for AI response
-      aiResponseFuture.then((response) {
-        if (!responseCompleter.isCompleted) {
-          responseCompleter.complete(response);
-        }
-      }).catchError((e) {
-        if (!responseCompleter.isCompleted) {
-          responseCompleter.completeError(e);
-        }
-      });
-      
-      // Get the session ID (runs in parallel with AI request)
-      final sessionId = await _getOrCreateChatSession(userId, agentType);
+      // For personalized advice, include user financial context
+      if (agentType == 'personal') {
+        // Get user's financial context for personalization (with timeout)
+        final userContext = await _personalizedAdviceService.getUserFinancialContext()
+            .timeout(const Duration(seconds: 3), onTimeout: () => {});
+        
+        // Send message with context to Gemini (parallel processing)
+        _geminiService.sendPersonalizedMessage(
+          agentType, 
+          message, 
+          userContext
+        ).then((response) {
+          if (!responseCompleter.isCompleted) {
+            // Log the personalized advice interaction in background
+            _personalizedAdviceService.logAdviceInteraction(
+              message, 
+              response, 
+              'personal_finance'
+            ).catchError((_) {});
+            responseCompleter.complete(response);
+          }
+        }).catchError((e) {
+          if (!responseCompleter.isCompleted) {
+            responseCompleter.completeError(e);
+          }
+        });
+      } else {
+        // Standard agent behavior for non-personalized agents
+        _geminiService.sendMessage(agentType, message).then((response) {
+          if (!responseCompleter.isCompleted) {
+            responseCompleter.complete(response);
+          }
+        }).catchError((e) {
+          if (!responseCompleter.isCompleted) {
+            responseCompleter.completeError(e);
+          }
+        });
+      }
       
       // Get the agent ID
       final agentId = _agentIds[agentType];
@@ -104,6 +133,9 @@ class AIAgentService {
         throw 'Invalid agent type';
       }
 
+      // Wait for the session ID
+      final sessionId = await sessionIdFuture;
+      
       // Add user message to Firestore (don't wait for completion)
       final messageRef = _firestore
           .collection('users')
@@ -134,8 +166,11 @@ class AIAgentService {
             }),
       );
 
-      // Wait for the AI response
-      final response = await responseCompleter.future;
+      // Wait for the AI response with timeout
+      final response = await responseCompleter.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => "I'm taking longer than expected to respond. Please try a simpler question or try again in a moment.",
+      );
       
       // Add bot response to Firestore (don't wait for completion)
       final botMessageRef = _firestore
@@ -161,12 +196,15 @@ class AIAgentService {
       };
     } catch (e) {
       print('Error sending message: $e');
-      rethrow;
+      return {
+        'sessionId': '',
+        'response': 'Sorry, an error occurred. Please try again.',
+      };
     }
   }
 
   // Method to get chat history for a user and agent
-  Future<List<Map<String, dynamic>>> getChatHistory(String agentType) async {
+  Future<List<Map<String, dynamic>>> getChatHistory(String agentType, {int limit = 50}) async {
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
@@ -183,7 +221,8 @@ class AIAgentService {
           .collection('chatSessions')
           .doc(sessionId)
           .collection('messages')
-          .orderBy('timestamp');
+          .orderBy('timestamp')
+          .limit(limit);
       
       final messages = await RetryHelper.withRetry(
         operation: () => messagesRef.get(),
