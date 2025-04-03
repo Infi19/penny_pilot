@@ -202,10 +202,12 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.primary,
-          labelColor: AppColors.primary,
+          indicatorColor: AppColors.tertiary,
+          labelColor: AppColors.tertiary,
           unselectedLabelColor: AppColors.lightGrey,
-          isScrollable: true, // Allow scrolling if there are many tabs
+          isScrollable: true,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+          tabAlignment: TabAlignment.start,
           tabs: _agents.map((agent) => Tab(
             icon: Icon(agent.icon),
             text: agent.name,

@@ -53,6 +53,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user != null) {
       try {
         final userData = await _userService.getUserProfile(user.uid);
+        
+        // If user has a photoURL in Auth but not in Firestore, update Firestore
+        if (user.photoURL != null && (userData == null || userData['photoURL'] == null)) {
+          await _userService.updateUserProfile(user.uid, {
+            'photoURL': user.photoURL,
+            'lastUpdated': DateTime.now().toIso8601String(),
+          });
+        }
+        
         setState(() {
           _userData = userData;
           _nameController.text = userData?['displayName'] ?? user.displayName ?? '';
@@ -85,31 +94,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         final user = _authService.getCurrentUser();
         if (user != null) {
-          String? photoURL = user.photoURL;
+          // Get current photo URL from Firestore or Firebase Auth
+          String? photoURL = _userData?['photoURL'] ?? user.photoURL;
           
           // Upload image if selected
           if (_selectedImage != null) {
-            final storageRef = FirebaseStorage.instance
-                .ref()
-                .child('profile_images')
-                .child('${user.uid}.jpg');
-                
-            await storageRef.putFile(_selectedImage!);
-            photoURL = await storageRef.getDownloadURL();
-            
-            // Update Firebase Auth photo URL
-            await user.updatePhotoURL(photoURL);
+            try {
+              // Create a reference to the storage location
+              final storageRef = FirebaseStorage.instance
+                  .ref()
+                  .child('profile_images');
+              
+              // Ensure the directory exists by creating a small test file if needed
+              try {
+                // Check if directory exists by listing its contents
+                await storageRef.listAll();
+              } catch (e) {
+                // Directory might not exist, create it with a placeholder
+                final placeholderRef = storageRef.child('.placeholder');
+                await placeholderRef.putString('');
+              }
+              
+              // Now create the user-specific file
+              final userImageRef = storageRef.child('${user.uid}.jpg');
+              
+              // Upload with metadata
+              final metadata = SettableMetadata(
+                contentType: 'image/jpeg',
+                customMetadata: {'userId': user.uid},
+              );
+              
+              await userImageRef.putFile(_selectedImage!, metadata);
+              photoURL = await userImageRef.getDownloadURL();
+              
+              // Update Firebase Auth photo URL
+              await user.updatePhotoURL(photoURL);
+            } catch (e) {
+              print('Error uploading profile image: $e');
+              // Continue with the rest of the profile update even if image upload fails
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to update profile picture, but other details will be saved'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            }
           }
           
-          // Update Firestore profile
-          await _userService.updateUserProfile(user.uid, {
+          // Update Firestore profile 
+          final Map<String, dynamic> updateData = {
             'displayName': _nameController.text,
             'phone': _phoneController.text,
             'bio': _bioController.text,
-            'photoURL': photoURL,
             'currency': _selectedCurrency,
             'lastUpdated': DateTime.now().toIso8601String(),
-          });
+          };
+          
+          // Always include photoURL in Firestore, whether it's from upload or existing
+          if (photoURL != null) {
+            updateData['photoURL'] = photoURL;
+          }
+          
+          await _userService.updateUserProfile(user.uid, updateData);
 
           // Update Firebase Auth display name
           await user.updateDisplayName(_nameController.text);
@@ -268,6 +316,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Profile Picture
                     Center(
@@ -278,10 +327,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             backgroundColor: AppColors.mediumGrey,
                             backgroundImage: _selectedImage != null
                                 ? FileImage(_selectedImage!)
-                                : user?.photoURL != null
-                                    ? NetworkImage(user!.photoURL!)
-                                    : null,
-                            child: _selectedImage == null && user?.photoURL == null
+                                : _userData?['photoURL'] != null
+                                    ? NetworkImage(_userData!['photoURL'])
+                                    : user?.photoURL != null
+                                        ? NetworkImage(user!.photoURL!)
+                                        : null,
+                            child: _selectedImage == null && 
+                                   _userData?['photoURL'] == null && 
+                                   user?.photoURL == null
                                 ? Text(
                                     (_userData?['displayName']?.isNotEmpty == true
                                             ? _userData!['displayName'][0]
@@ -320,174 +373,243 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 30),
-
-                    // Email
-                    ListTile(
-                      leading: const Icon(Icons.email, color: AppColors.mediumGrey),
-                      title: const Text('Email', style: TextStyle(color: AppColors.lightest)),
-                      subtitle: Text(
-                        _userData?['email'] ?? user?.email ?? 'No email',
-                        style: const TextStyle(color: AppColors.lightGrey),
-                      ),
-                    ),
-                    Divider(color: AppColors.darkGrey),
-
-                    // Name
-                    ListTile(
-                      leading: const Icon(Icons.person, color: AppColors.mediumGrey),
-                      title: const Text('Full Name', style: TextStyle(color: AppColors.lightest)),
-                      subtitle: _isEditing
-                          ? TextFormField(
-                              controller: _nameController,
-                              style: const TextStyle(color: AppColors.lightest),
-                              decoration: InputDecoration(
-                                hintText: 'Enter your name',
-                                hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your name';
-                                }
-                                return null;
-                              },
-                            )
-                          : Text(
-                              _userData?['displayName'] ?? user?.displayName ?? 'No name set',
-                              style: const TextStyle(color: AppColors.lightGrey),
-                            ),
-                    ),
-                    Divider(color: AppColors.darkGrey),
-
-                    // Phone
-                    ListTile(
-                      leading: const Icon(Icons.phone, color: AppColors.mediumGrey),
-                      title: const Text('Phone', style: TextStyle(color: AppColors.lightest)),
-                      subtitle: _isEditing
-                          ? TextFormField(
-                              controller: _phoneController,
-                              style: const TextStyle(color: AppColors.lightest),
-                              decoration: InputDecoration(
-                                hintText: 'Enter your phone number',
-                                hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                              ),
-                            )
-                          : Text(
-                              _userData?['phone'] ?? 'No phone number',
-                              style: const TextStyle(color: AppColors.lightGrey),
-                            ),
-                    ),
-                    Divider(color: AppColors.darkGrey),
-
-                    // Bio
-                    ListTile(
-                      leading: const Icon(Icons.description, color: AppColors.mediumGrey),
-                      title: const Text('Bio', style: TextStyle(color: AppColors.lightest)),
-                      subtitle: _isEditing
-                          ? TextFormField(
-                              controller: _bioController,
-                              style: const TextStyle(color: AppColors.lightest),
-                              maxLines: 3,
-                              decoration: InputDecoration(
-                                hintText: 'Tell us about yourself',
-                                hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: AppColors.mediumGrey),
-                                ),
-                              ),
-                            )
-                          : Text(
-                              _userData?['bio'] ?? 'No bio added',
-                              style: const TextStyle(color: AppColors.lightGrey),
-                            ),
-                    ),
-                    Divider(color: AppColors.darkGrey),
-
-                    const SizedBox(height: 30),
-
-                    // Currency
-                    ListTile(
-                      leading: const Icon(Icons.currency_exchange, color: AppColors.mediumGrey),
-                      title: const Text('Currency', style: TextStyle(color: AppColors.lightest)),
-                      subtitle: _isEditing
-                          ? DropdownButton<String>(
-                              value: _selectedCurrency,
-                              dropdownColor: AppColors.darkGrey,
-                              isExpanded: true,
-                              underline: Container(
-                                height: 1,
-                                color: AppColors.mediumGrey,
-                              ),
-                              style: const TextStyle(color: AppColors.lightest),
-                              onChanged: (String? newValue) {
-                                if (newValue != null) {
-                                  setState(() {
-                                    _selectedCurrency = newValue;
-                                  });
-                                }
-                              },
-                              items: CurrencyUtil.getCurrencyDropdownItems(),
-                            )
-                          : Row(
-                              children: [
-                                Text(
-                                  CurrencyUtil.getCurrencyData(_selectedCurrency).flag + ' ',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                Text(
-                                  _selectedCurrency + ' - ' + 
-                                  CurrencyUtil.getCurrencyData(_selectedCurrency).symbol,
-                                  style: const TextStyle(color: AppColors.lightGrey),
-                                ),
-                              ],
-                            ),
-                    ),
-                    Divider(color: AppColors.darkGrey),
-
-                    // Financial Health Calculator
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const FinancialHealthScreen(),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.darkGrey,
-                          foregroundColor: AppColors.lightest,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text('Financial Health Calculator'),
-                      ),
-                    ),
+                    const SizedBox(height: 20),
                     
-                    const SizedBox(height: 15),
+                    // Profile Information Section
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkGrey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Email
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.email, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Email', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: Text(
+                              _userData?['email'] ?? user?.email ?? 'No email',
+                              style: const TextStyle(color: AppColors.lightGrey),
+                            ),
+                          ),
+                          Divider(color: AppColors.darkGrey),
+
+                          // Name
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.person, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Full Name', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: _isEditing
+                                ? TextFormField(
+                                    controller: _nameController,
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter your name',
+                                      hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter your name';
+                                      }
+                                      return null;
+                                    },
+                                  )
+                                : Text(
+                                    _userData?['displayName'] ?? user?.displayName ?? 'No name set',
+                                    style: const TextStyle(color: AppColors.lightGrey),
+                                  ),
+                          ),
+                          Divider(color: AppColors.darkGrey),
+
+                          // Phone
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.phone, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Phone', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: _isEditing
+                                ? TextFormField(
+                                    controller: _phoneController,
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter your phone number',
+                                      hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    _userData?['phone'] ?? 'No phone number',
+                                    style: const TextStyle(color: AppColors.lightGrey),
+                                  ),
+                          ),
+                          Divider(color: AppColors.darkGrey),
+
+                          // Bio
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.description, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Bio', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: _isEditing
+                                ? TextFormField(
+                                    controller: _bioController,
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    maxLines: 3,
+                                    decoration: InputDecoration(
+                                      hintText: 'Tell us about yourself',
+                                      hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    _userData?['bio'] ?? 'No bio added',
+                                    style: const TextStyle(color: AppColors.lightGrey),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+                    
+                    // Currency Section - Separated from other profile fields
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkGrey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      child: ListTile(
+                        dense: true,
+                        horizontalTitleGap: 10,
+                        leading: const Icon(Icons.currency_exchange, color: AppColors.mediumGrey, size: 24),
+                        title: const Text('Currency', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit, color: AppColors.mediumGrey),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                String tempCurrency = _selectedCurrency;
+                                return AlertDialog(
+                                  backgroundColor: AppColors.darkGrey,
+                                  title: const Text(
+                                    'Select Currency',
+                                    style: TextStyle(color: AppColors.lightest),
+                                  ),
+                                  content: DropdownButton<String>(
+                                    value: tempCurrency,
+                                    dropdownColor: AppColors.darkGrey,
+                                    isExpanded: true,
+                                    underline: Container(
+                                      height: 1,
+                                      color: AppColors.mediumGrey,
+                                    ),
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    onChanged: (String? newValue) {
+                                      if (newValue != null) {
+                                        tempCurrency = newValue;
+                                        Navigator.pop(context, newValue);
+                                      }
+                                    },
+                                    items: CurrencyUtil.getCurrencyDropdownItems(),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(color: AppColors.mediumGrey),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            ).then((value) async {
+                              if (value != null) {
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                
+                                try {
+                                  final user = _authService.getCurrentUser();
+                                  if (user != null) {
+                                    // Only update the currency field
+                                    await _userService.updateUserProfile(user.uid, {
+                                      'currency': value,
+                                      'lastUpdated': DateTime.now().toIso8601String(),
+                                    });
+                                    
+                                    setState(() {
+                                      _selectedCurrency = value;
+                                      _isLoading = false;
+                                    });
+                                    
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Currency updated successfully'),
+                                          backgroundColor: AppColors.mediumGrey,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  setState(() {
+                                    _isLoading = false;
+                                  });
+                                  
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Error updating currency: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        subtitle: Row(
+                          children: [
+                            Text(
+                              CurrencyUtil.getCurrencyData(_selectedCurrency).flag + ' ',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                            Text(
+                              _selectedCurrency + ' - ' + 
+                              CurrencyUtil.getCurrencyData(_selectedCurrency).symbol,
+                              style: const TextStyle(color: AppColors.lightGrey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
                     // Logout Button
                     SizedBox(
@@ -498,6 +620,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           backgroundColor: AppColors.darkGrey,
                           foregroundColor: AppColors.lightest,
                           padding: const EdgeInsets.symmetric(vertical: 15),
+                          elevation: 2,
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
