@@ -11,7 +11,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/gemini_service.dart';
 import 'services/personalized_advice_service.dart';
+import 'services/quiz_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,15 +46,22 @@ Future<void> initServices() async {
   
   // Pre-initialize singletons for faster app startup
   GeminiService(); // This initializes the GeminiService singleton
+  final quizService = QuizService(); // Initialize quiz service
   
-  // Ensure AI personalization is ready by pre-warming
+  // Always check for daily quiz updates to ensure fresh content every day
+  quizService.performDailyUpdates().catchError((e) {
+    // Silently handle any errors during daily quiz update
+    print('Error performing daily quiz update: $e');
+  });
+  
+  // If user is logged in, prefetch additional personalized data
   if (FirebaseAuth.instance.currentUser != null) {
     try {
       final personalizedAdviceService = PersonalizedAdviceService();
       // Prefetch user context in background
       personalizedAdviceService.getUserFinancialContext();
     } catch (e) {
-      print('Error pre-initializing AI personalization: $e');
+      print('Error pre-initializing services: $e');
     }
   }
 }
@@ -62,26 +71,33 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Penny Pilot',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4b0082)),
-        useMaterial3: true,
-      ),
-      home: StreamBuilder<User?>(
-        stream: AuthService().authStateChanges,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
-          }
-          
-          if (snapshot.hasData) {
-            return const HomeScreen();
-          }
-          
-          return const LaunchScreen();
-        },
+    return MultiProvider(
+      providers: [
+        Provider<QuizService>(
+          create: (_) => QuizService(),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Penny Pilot',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4b0082)),
+          useMaterial3: true,
+        ),
+        home: StreamBuilder<User?>(
+          stream: AuthService().authStateChanges,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SplashScreen();
+            }
+            
+            if (snapshot.hasData) {
+              return const HomeScreen();
+            }
+            
+            return const LaunchScreen();
+          },
+        ),
       ),
     );
   }

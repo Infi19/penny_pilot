@@ -3,6 +3,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:collection';
+import 'dart:math' as math;
 
 class GeminiService {
   static GeminiService? _instance;
@@ -80,21 +81,59 @@ class GeminiService {
   // Send a message to the model and get a response
   Future<String> sendMessage(String agentType, String message) async {
     try {
-      // Check if the response is cached
-      final cacheKey = _generateCacheKey(agentType, message);
-      if (_responseCache.containsKey(cacheKey)) {
-        return _responseCache[cacheKey]!;
+      // Special handling for quiz requests - always use a new session
+      final bool isQuizRequest = agentType.startsWith('quiz_');
+      final bool isAdvancedQuiz = isQuizRequest && agentType.contains('advanced');
+      
+      if (isAdvancedQuiz) {
+        print('DEBUG: GeminiService - Handling advanced quiz request: $agentType');
       }
-
-      final session = getOrCreateSession(agentType);
+      
+      // Skip caching for quiz requests to ensure fresh content
+      if (!isQuizRequest) {
+        // Check if the response is cached
+        final cacheKey = _generateCacheKey(agentType, message);
+        if (_responseCache.containsKey(cacheKey)) {
+          print('DEBUG: Using cached response for $agentType');
+          return _responseCache[cacheKey]!;
+        }
+      } else {
+        print('DEBUG: Bypassing cache for quiz request: $agentType');
+        if (isAdvancedQuiz) {
+          print('DEBUG: GeminiService - Creating fresh session for advanced quiz');
+        }
+      }
+      
+      // For quiz requests, create a one-time session instead of reusing
+      ChatSession session;
+      if (isQuizRequest) {
+        session = _model.startChat();
+        if (isAdvancedQuiz) {
+          print('DEBUG: GeminiService - Created new chat session for advanced quiz');
+        }
+      } else {
+        session = getOrCreateSession(agentType);
+      }
       
       // For the first message, prepend the system prompt
       final isFirstMessage = session.history.isEmpty;
       
       String prompt = message;
       if (isFirstMessage) {
-        final systemPrompt = _getSystemPromptForAgent(agentType);
-        prompt = "$systemPrompt\n\nUser: $message";
+        // Don't use system prompts for quiz generation
+        if (!isQuizRequest) {
+          final systemPrompt = _getSystemPromptForAgent(agentType);
+          prompt = "$systemPrompt\n\nUser: $message";
+        } else if (isAdvancedQuiz) {
+          print('DEBUG: GeminiService - Using direct prompt for advanced quiz without system prompts');
+        }
+      }
+      
+      print('DEBUG: Sending prompt to Gemini with agent type: $agentType');
+      
+      if (isAdvancedQuiz) {
+        print('DEBUG: GeminiService - Advanced quiz prompt length: ${prompt.length}');
+        print('DEBUG: GeminiService - Advanced quiz prompt starts with: ${prompt.substring(0, math.min(100, prompt.length))}...');
       }
       
       // Send the message to the model
@@ -103,12 +142,23 @@ class GeminiService {
       // Get the response text
       final responseText = response.text ?? 'Sorry, I couldn\'t generate a response.';
       
-      // Cache the response
-      _addToCache(cacheKey, responseText);
+      if (isAdvancedQuiz) {
+        print('DEBUG: GeminiService - Advanced quiz response received, length: ${responseText.length}');
+        print('DEBUG: GeminiService - Response starts with: ${responseText.substring(0, math.min(100, responseText.length))}...');
+      }
+      
+      // Cache the response (only for non-quiz requests)
+      if (!isQuizRequest) {
+        final cacheKey = _generateCacheKey(agentType, message);
+        _addToCache(cacheKey, responseText);
+      } else if (isAdvancedQuiz) {
+        print('DEBUG: GeminiService - Not caching advanced quiz response as expected');
+      }
       
       // Return the response
       return responseText;
     } catch (e) {
+      print('DEBUG: Error in Gemini service: $e');
       return 'Sorry, an error occurred: $e';
     }
   }

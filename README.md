@@ -1,59 +1,136 @@
 # Penny Pilot
 
-A financial education and management app with AI assistant capabilities.
+<p align="center">
+  <img src="assets/images/icon.png" width="120" alt="Penny Pilot Logo">
+</p>
 
-## Gemini AI Integration
+A comprehensive mobile application for financial education, management, and AI-powered assistance. Penny Pilot helps users make informed financial decisions through personalized advice, fraud detection, financial myth busting, and roadmap guidance.
 
-This app uses Google's Gemini AI to power its AI assistants. Follow these steps to set up the Gemini integration:
+## 📱 Features
 
-### 1. Get a Gemini API Key
+### AI Assistants
+- **Smart Finance Advisor:** Provides personalized financial advice based on user profiles, goals, and risk tolerance
+- **Fraud Detective:** Helps identify and learn about financial fraud schemes
+- **Myth Buster:** Debunks financial myths and misconceptions
+- **Roadmap Guide:** Offers guidance on financial journeys
 
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sign in with your Google account
-3. Create a new API key
-4. Copy the API key to your clipboard
+### User Profile & Goals
+- Create and manage personal financial profiles
+- Set and track financial goals
+- Receive personalized investment recommendations
 
-### 2. Configure the API Key
+### Financial Education
+- Learn about investment concepts and strategies
+- Understand market terminology
+- Access expert financial insights
 
-1. Locate the `.env` file in the project root
-2. Replace `your_gemini_api_key_here` with your actual API key:
+## 🔧 Technology Stack
+
+- **Frontend:** Flutter (Dart)
+- **Backend:** Firebase
+  - Authentication
+  - Firestore (database)
+  - Storage
+  - App Check (security)
+- **AI Integration:** Google Gemini AI
+
+## 📋 Requirements
+
+- Flutter SDK: ^3.7.2
+- Dart SDK: ^3.7.2
+- Android: minSdkVersion 21
+- iOS: iOS 12+
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Flutter installed and configured ([Flutter Installation Guide](https://flutter.dev/docs/get-started/install))
+- An IDE (VS Code, Android Studio, or IntelliJ)
+- Git
+- A Firebase account
+
+### Setting Up Firebase
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Configure Firebase for your Flutter app:
+   - Android: Add your app to Firebase, download `google-services.json` and place it in `android/app/`
+   - iOS: Add your app to Firebase, download `GoogleService-Info.plist` and place it in `ios/Runner/`
+
+### Setting Up Gemini AI
+1. Get a Gemini API Key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create a `.env` file in the project root:
    ```
    GEMINI_API_KEY=your_actual_api_key_here
    ```
-3. Save the file
-4. Never share or commit your API key to version control
 
-### 3. Running the App
+### Installation
+1. Clone the repository:
+   ```bash
+   git clone [repository-url]
+   cd penny_pilot
+   ```
 
-1. Make sure you have Flutter and all dependencies installed
-2. Run `flutter pub get` to install packages
-3. Run the app with `flutter run`
+2. Install dependencies:
+   ```bash
+   flutter pub get
+   ```
 
-### Troubleshooting
+3. Run the app:
+   ```bash
+   flutter run
+   ```
 
-- If you see "Gemini API key not found" error, check that your .env file exists and contains the correct API key
-- If the API calls fail, verify that your API key is valid and has not exceeded its quota
-- For other issues, check the Flutter console for detailed error messages
+## 📂 Project Structure
 
-## Features
+```
+lib/
+├── main.dart              # Entry point
+├── firebase_options.dart  # Firebase configuration
+├── models/                # Data models
+├── screens/               # UI screens
+├── services/              # Business logic and API services
+├── utils/                 # Utility functions and constants
+└── widgets/               # Reusable UI components
+```
 
-- AI-powered financial assistants for different topics
-- Secure chat history storage
-- Multiple AI agents with specialized knowledge
+## 🔒 Security
 
-## License
+This app uses Firebase App Check to prevent unauthorized access to backend resources. In production, you should configure proper App Check providers:
+
+```dart
+await FirebaseAppCheck.instance.activate(
+  androidProvider: AndroidProvider.playIntegrity,
+  appleProvider: AppleProvider.deviceCheck,
+);
+```
+
+## 🛠️ Development Guidelines
+
+- Follow [Flutter style guide](https://dart.dev/guides/language/effective-dart/style)
+- Write tests for new features
+- Use feature branches and pull requests for collaborative development
+
+## 📈 Future Roadmap
+
+- Portfolio management tools
+- Integration with real financial institutions
+- Budgeting and expense tracking
+- Community features for financial discussion
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
 
 This project is proprietary and confidential.
 
-## Getting Started
+## 👥 Team
 
-This project is a starting point for a Flutter application.
+- [Your Name/Team Members]
+- Contact: [Your Email]
 
-A few resources to get you started if this is your first Flutter project:
+## 🙏 Acknowledgements
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- [Flutter](https://flutter.dev/)
+- [Firebase](https://firebase.google.com/)
+- [Google Generative AI](https://developers.generativeai.google/)

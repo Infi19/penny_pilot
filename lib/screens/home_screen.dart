@@ -19,6 +19,7 @@ import 'financial_health_screen.dart';
 import '../services/user_service.dart';
 import '../utils/currency_util.dart';
 import 'financial_health_result_screen.dart';
+import '../services/quiz_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,6 +31,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final AuthService _authService = AuthService();
+  final QuizService _quizService = QuizService();
 
   final List<Widget> _screens = [
     const HomeContent(),
@@ -46,6 +48,14 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
+          // Check for quiz updates when navigating to Learn tab
+          if (index == 2) {
+            // Refresh quizzes when navigating to Learn tab
+            _quizService.performDailyUpdates().catchError((e) {
+              print('Error checking for daily quiz updates: $e');
+            });
+          }
+          
           setState(() {
             _currentIndex = index;
           });
