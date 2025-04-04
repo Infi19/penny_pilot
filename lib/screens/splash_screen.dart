@@ -103,7 +103,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
+                    
+                    // Powered by Gemini text
+                    const Text(
+                      'powered by Gemini',
+                      style: TextStyle(
+                        color: AppColors.quaternary,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     
                     // Subtitle
                     const Text(

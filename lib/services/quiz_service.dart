@@ -63,18 +63,22 @@ class QuizService {
       
       // Prompt for the Gemini model to generate multiple quiz questions with Indian context
       final prompt = '''
-Create $count completely new ${difficultyText} multiple-choice questions about investing concepts specific to Indian investors.
-Format your response exactly as a JSON array with $count objects, each having these fields:
-[
-  {
+IMPORTANT: Generate $count COMPLETELY FRESH and UNIQUE multiple-choice questions about investing concepts specific to Indian investors. 
+These MUST be different from any questions you have generated before.
+
+Your task is to create ${difficultyText} questions that test knowledge of ${topicsText}.
+
+Rules:
+1. Every question MUST be original and not similar to previous questions
+2. Format as a valid JSON array with $count objects
+3. Each object should have these exact fields:
+   {
     "question": "The question text here",
     "options": ["Option A", "Option B", "Option C", "Option D"],
     "correctAnswerIndex": 0-3 (index of the correct answer),
     "explanation": "Explanation of why the answer is correct",
     "difficulty": "${difficultyString}"
-  },
-  // more questions...
-]
+   }
 
 The questions should teach users valuable concepts about investing in the Indian market context.
 Cover topics like: ${topicsText}
@@ -83,9 +87,9 @@ Use Indian companies, Indian indices (like Nifty, Sensex), and Indian financial 
 Make sure each question has 4 options that are plausible but only one is correct.
 Make the difficulty appropriate for a ${difficultyString} level investor.
 
-IMPORTANT: Create completely new questions that are different from previous ones.
+CRUCIAL: DO NOT REPEAT QUESTIONS you've generated before. Create completely new content.
 Current timestamp: $timestamp
-Difficulty level: $difficultyString
+Session ID: $sessionId
 Force refresh: ${forceRefresh ? "YES" : "NO"}
 ''';
 
@@ -873,6 +877,7 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
       final totalPoints = data['totalPoints'] ?? 50;
       final userAnswers = data['userAnswers'] != null ? List<int>.from(data['userAnswers']) : <int>[];
       final correctAnswers = score; // Correct answers equals the score/10
+      final difficultyStr = data['difficulty'] ?? 'beginner';
       
       results.add(QuizResult(
         quizId: quizId,
@@ -883,10 +888,76 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
         totalPoints: totalPoints,
         userAnswers: userAnswers,
         correctAnswers: correctAnswers,
+        difficulty: userLevelFromString(difficultyStr),
       ));
     }
     
     return results;
+  }
+  
+  // Get detailed quiz information including questions and user answers
+  Future<Map<String, dynamic>?> getQuizDetails(String quizId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    
+    try {
+      // Get the quiz document
+      final docSnap = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('dailyQuizzes')
+          .doc(quizId)
+          .get();
+      
+      if (!docSnap.exists) {
+        print('DEBUG: Quiz with ID $quizId not found');
+        return null;
+      }
+      
+      final data = docSnap.data()!;
+      
+      // Extract questions and user answers
+      final List<dynamic> questionsData = data['questions'] ?? [];
+      final List<QuizQuestion> questions = questionsData
+          .map((q) => QuizQuestion.fromJson(q))
+          .toList();
+      
+      final List<int> userAnswers = data['userAnswers'] != null 
+          ? List<int>.from(data['userAnswers']) 
+          : List<int>.filled(questions.length, -1);
+      
+      // Create a list of question results
+      final List<Map<String, dynamic>> questionResults = [];
+      
+      for (int i = 0; i < questions.length; i++) {
+        final question = questions[i];
+        final userAnswer = i < userAnswers.length ? userAnswers[i] : -1;
+        final isCorrect = userAnswer == question.correctAnswerIndex;
+        
+        questionResults.add({
+          'question': question.question,
+          'options': question.options,
+          'correctAnswerIndex': question.correctAnswerIndex,
+          'userAnswerIndex': userAnswer,
+          'isCorrect': isCorrect,
+          'explanation': question.explanation,
+        });
+      }
+      
+      // Return the full quiz details
+      return {
+        'quizId': quizId,
+        'date': data['date'],
+        'score': data['userScore'] ?? 0,
+        'totalPoints': data['totalPoints'] ?? 50,
+        'earnedPoints': data['points'] ?? 0,
+        'difficulty': data['difficulty'] ?? 'beginner',
+        'questionResults': questionResults,
+      };
+    } catch (e) {
+      print('DEBUG: Error fetching quiz details: $e');
+      return null;
+    }
   }
   
   // Get the user's current leaderboard position and total points
@@ -967,7 +1038,7 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
     }
   }
   
-  // Generate a new daily quiz for all users
+  // Generate new daily quiz for all users
   Future<void> generateNewDailyQuizForAllUsers() async {
     try {
       print('DEBUG: Generating new daily quizzes for all difficulty levels');
@@ -976,7 +1047,28 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
       final String formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       
-      // First, mark all existing daily quizzes as not daily
+      // First, completely clear caching at all levels
+      print('DEBUG: Performing aggressive cache clearing for quiz regeneration');
+      
+      // 1. Reset Gemini service sessions for all quiz types
+      _geminiService.resetAllSessions();
+      print('DEBUG: Reset all Gemini sessions');
+      
+      // 2. Clear shared preferences cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // Clear all quiz-related caches
+        final keys = prefs.getKeys().where((key) => key.contains('quiz') || key.contains('Quiz')).toList();
+        for (var key in keys) {
+          await prefs.remove(key);
+        }
+        await prefs.remove('cached_daily_quiz');
+        print('DEBUG: Cleared all quiz caches in SharedPreferences: ${keys.length} keys removed');
+      } catch (e) {
+        print('DEBUG: Error clearing SharedPreferences cache: $e');
+      }
+      
+      // 3. Mark all existing daily quizzes as not daily in Firestore
       try {
         print('DEBUG: Updating previous daily quizzes to not be daily');
         final allQuizzes = await _firestore.collection('quizzes').get();
@@ -996,88 +1088,58 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
         // Continue with quiz generation even if updating fails
       }
       
-      // Clear shared preferences cache
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('cached_daily_quiz');
-        print('DEBUG: Cleared quiz cache in SharedPreferences');
-      } catch (e) {
-        print('DEBUG: Error clearing SharedPreferences cache: $e');
-      }
+      print('DEBUG: Beginning quiz generation for all difficulty levels with timestamp: $timestamp');
       
-      // Clear Gemini cache by resetting the session
-      try {
-        _geminiService.resetSession('quiz');
-        print('DEBUG: Reset Gemini session for quiz');
-      } catch (e) {
-        print('DEBUG: Error resetting Gemini session: $e');
-      }
-      
-      print('DEBUG: Beginning quiz generation for all difficulty levels');
-      
-      // Additional reset to force new sessions
+      // For each level, create and save a quiz with custom handling per level
       for (var level in levels) {
-        try {
-          final sessionId = 'quiz_${userLevelToString(level)}';
-          _geminiService.resetSession(sessionId);
-          print('DEBUG: Reset session for ${userLevelToString(level)}');
-        } catch (e) {
-          print('DEBUG: Error resetting specific level session: $e');
-        }
-      }
-      
-      // For each level, create and save a quiz - handle advanced specifically
-      for (var level in levels) {
-        print('DEBUG: Starting generation for level: ${userLevelToString(level)} (${level.toString()})');
+        final levelString = userLevelToString(level);
+        print('DEBUG: Starting generation for level: $levelString (${level.toString()})');
         
         try {
+          // Force a fresh session for this specific level
+          final uniqueSessionId = 'quiz_${levelString}_${timestamp}_${_uuid.v4()}';
+          _geminiService.resetSession(uniqueSessionId);
+          print('DEBUG: Created unique session for $levelString: $uniqueSessionId');
+          
           // Generate 5 questions for this difficulty level with forced refresh
-          print('DEBUG: About to generate questions for ${userLevelToString(level)}');
+          print('DEBUG: Generating questions for $levelString with forceRefresh=true');
           
           List<QuizQuestion> questions = [];
           
-          // Retry logic for advanced level
+          // Special handling for advanced level
           if (level == UserLevel.advanced) {
-            // Specific handling for advanced level which seems to have issues
-            print('DEBUG: Advanced level - using special handling');
+            print('DEBUG: Using enhanced generation for advanced level');
+            questions = await _generateQuestionsWithRetry(5, level, timestamp);
+          } else {
+            // Normal handling for other levels with one retry attempt
             try {
               questions = await generateMultipleQuestions(5, level, forceRefresh: true);
-              print('DEBUG: Advanced level - initial generation result: ${questions.length} questions');
-            } catch (firstAttemptError) {
-              print('DEBUG: Advanced level - first attempt failed: $firstAttemptError');
-              print('DEBUG: Advanced level - retrying with additional parameters');
               
-              // Wait a moment between attempts
-              await Future.delayed(const Duration(seconds: 1));
-              
-              // Try again with explicit unique session
-              try {
-                final uniqueSessionId = 'quiz_advanced_retry_${DateTime.now().millisecondsSinceEpoch}';
-                _geminiService.resetSession(uniqueSessionId);
-                
-                print('DEBUG: Advanced level - second attempt with session: $uniqueSessionId');
+              // If we got fewer than 5 questions, or they seem like fallback questions, try once more
+              if (questions.length < 5 || _looksLikeFallbackQuestions(questions)) {
+                print('DEBUG: First attempt for $levelString returned potentially cached content, retrying...');
+                // Wait briefly before retry
+                await Future.delayed(const Duration(milliseconds: 500));
+                // Generate with a new session ID
+                final retrySessionId = 'quiz_${levelString}_retry_${timestamp}_${_uuid.v4()}';
+                _geminiService.resetSession(retrySessionId);
                 questions = await generateMultipleQuestions(5, level, forceRefresh: true);
-                print('DEBUG: Advanced level - second attempt result: ${questions.length} questions');
-              } catch (secondAttemptError) {
-                print('DEBUG: Advanced level - second attempt also failed: $secondAttemptError');
-                print('DEBUG: Advanced level - falling back to default questions');
-                questions = _getFallbackQuestions(5, level);
               }
+            } catch (e) {
+              print('DEBUG: Error generating $levelString questions: $e, using fallbacks');
+              questions = _getFallbackQuestions(5, level);
             }
-          } else {
-            // Normal handling for other levels
-            questions = await generateMultipleQuestions(5, level, forceRefresh: true);
           }
           
-          print('DEBUG: Generated ${questions.length} questions for ${userLevelToString(level)} level');
+          print('DEBUG: Generated ${questions.length} questions for $levelString level');
           
           if (questions.isEmpty) {
-            print('DEBUG: No questions generated for level ${userLevelToString(level)}. Skipping.');
+            print('DEBUG: No questions generated for $levelString. Skipping.');
             continue;
           }
           
           // Print the first question for each difficulty level for debugging
-          print('DEBUG: First question for ${userLevelToString(level)}: "${questions[0].question}"');
+          print('DEBUG: First question for $levelString: "${questions[0].question}"');
           
           // Create a new quiz for this level
           final quizId = _uuid.v4();
@@ -1091,7 +1153,7 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
           // Save it to the global quizzes collection
           final DocumentReference quizRef = _firestore.collection('quizzes').doc();
           
-          print('DEBUG: Saving quiz with ID $quizId for level ${userLevelToString(level)}');
+          print('DEBUG: Saving quiz with ID $quizId for level $levelString');
           
           final quizData = {
             'id': quizId,
@@ -1099,76 +1161,124 @@ Force refresh: ${forceRefresh ? "YES" : "NO"}
             'questions': quiz.questions.map((q) => q.toJson()).toList(),
             'availableFrom': formattedDate,
             'isDaily': true,
-            'difficulty': userLevelToString(level),
+            'difficulty': levelString,
             'generatedAt': timestamp, // Add timestamp for tracking
           };
           
           await quizRef.set(quizData);
           
-          if (level == UserLevel.advanced) {
-            // Extra validation for advanced quiz
-            print('DEBUG: ADVANCED - Verifying saved quiz data');
-            final verifyDoc = await quizRef.get();
-            if (verifyDoc.exists) {
-              final savedData = verifyDoc.data() as Map<String, dynamic>;
-              print('DEBUG: ADVANCED - Quiz saved with difficulty: ${savedData['difficulty']}');
-              print('DEBUG: ADVANCED - Quiz has ${(savedData['questions'] as List).length} questions');
-            } else {
-              print('DEBUG: ADVANCED - ERROR: Quiz document was not saved correctly');
-            }
-          }
-          
-          print('DEBUG: Successfully created daily quiz for level: ${userLevelToString(level)} with ID: ${quiz.id}');
-        } catch (levelError) {
-          print('DEBUG: Error generating quiz for level ${userLevelToString(level)}: $levelError');
-          // Continue with next level
-          if (level == UserLevel.advanced) {
-            print('DEBUG: ADVANCED LEVEL GENERATION FAILED: $levelError');
-            
-            // Try to create a simple fallback for advanced level directly
-            try {
-              print('DEBUG: Creating emergency fallback quiz for advanced level');
-              final fallbackQuestions = _getFallbackQuestions(5, UserLevel.advanced);
-              
-              final quizId = _uuid.v4();
-              await _firestore.collection('quizzes').doc().set({
-                'id': quizId,
-                'date': DateTime.now().toIso8601String(),
-                'questions': fallbackQuestions.map((q) => q.toJson()).toList(),
-                'availableFrom': formattedDate,
-                'isDaily': true,
-                'difficulty': 'advanced',
-                'generatedAt': timestamp,
-              });
-              
-              print('DEBUG: Emergency fallback quiz for advanced level created successfully');
-            } catch (fallbackError) {
-              print('DEBUG: Even emergency fallback failed: $fallbackError');
-            }
-          }
+          print('DEBUG: Successfully created daily quiz for level: $levelString with ID: ${quiz.id}');
+        } catch (e) {
+          print('DEBUG: Error generating quiz for $levelString: $e');
         }
       }
       
-      print('DEBUG: Quiz generation process completed successfully');
+      print('DEBUG: Completed generating quizzes for all difficulty levels');
       
-      // Additional verification step
-      print('DEBUG: Verifying all daily quizzes after generation');
-      final verifyQuizzes = await _firestore
-          .collection('quizzes')
-          .where('isDaily', isEqualTo: true)
-          .get();
-          
-      print('DEBUG: Found ${verifyQuizzes.docs.length} daily quizzes after generation');
-      for (var doc in verifyQuizzes.docs) {
-        final data = doc.data();
-        print('DEBUG: Verified quiz: ID=${data['id']}, Difficulty=${data['difficulty']}');
-      }
     } catch (e) {
-      print('DEBUG: Error generating new daily quizzes: $e');
-      throw e; // Rethrow so the UI can handle it
+      print('DEBUG: Error in generateNewDailyQuizForAllUsers: $e');
     }
   }
   
+  // Helper function to generate questions with multiple retry attempts for advanced level
+  Future<List<QuizQuestion>> _generateQuestionsWithRetry(int count, UserLevel level, String timestamp) async {
+    print('DEBUG: Starting enhanced question generation with retries for ${userLevelToString(level)}');
+    
+    // First attempt
+    try {
+      final uniqueSessionId = 'quiz_${userLevelToString(level)}_${timestamp}_attempt1_${_uuid.v4()}';
+      _geminiService.resetSession(uniqueSessionId);
+      print('DEBUG: First attempt with session: $uniqueSessionId');
+      
+      final questions = await generateMultipleQuestions(count, level, forceRefresh: true);
+      if (questions.length >= count && !_looksLikeFallbackQuestions(questions)) {
+        print('DEBUG: First attempt successful with ${questions.length} questions');
+        return questions;
+      }
+      
+      print('DEBUG: First attempt returned potential cached content, trying again...');
+    } catch (e) {
+      print('DEBUG: First attempt failed: $e');
+    }
+    
+    // Second attempt with delay
+    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final uniqueSessionId = 'quiz_${userLevelToString(level)}_${timestamp}_attempt2_${_uuid.v4()}';
+      _geminiService.resetSession(uniqueSessionId);
+      print('DEBUG: Second attempt with session: $uniqueSessionId');
+      
+      final questions = await generateMultipleQuestions(count, level, forceRefresh: true);
+      if (questions.length >= count && !_looksLikeFallbackQuestions(questions)) {
+        print('DEBUG: Second attempt successful with ${questions.length} questions');
+        return questions;
+      }
+      
+      print('DEBUG: Second attempt also returned cached-like content, trying final attempt...');
+    } catch (e) {
+      print('DEBUG: Second attempt failed: $e');
+    }
+    
+    // Third attempt with different parameters
+    await Future.delayed(const Duration(seconds: 2));
+    try {
+      final uniqueSessionId = 'quiz_${userLevelToString(level)}_${timestamp}_final_${_uuid.v4()}';
+      _geminiService.resetSession(uniqueSessionId);
+      
+      // Use different phrasing in the method to avoid pattern matching
+      final alternateTimestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      print('DEBUG: Final attempt with completely new session: $uniqueSessionId and timestamp: $alternateTimestamp');
+      
+      final questions = await generateMultipleQuestions(count, level, forceRefresh: true);
+      print('DEBUG: Final attempt returned ${questions.length} questions');
+      return questions;
+    } catch (e) {
+      print('DEBUG: All attempts failed, using fallback questions: $e');
+      return _getFallbackQuestions(count, level);
+    }
+  }
+  
+  // Helper function to check if questions seem like fallbacks based on content
+  bool _looksLikeFallbackQuestions(List<QuizQuestion> questions) {
+    if (questions.isEmpty) return true;
+    
+    // Check if the questions match known fallback patterns
+    final fallbacks = _getFallbackQuestions(5, questions[0].difficulty);
+    
+    // Check for identical questions
+    for (var question in questions) {
+      for (var fallback in fallbacks) {
+        // If question texts are very similar, it might be a fallback
+        if (_calculateSimilarity(question.question, fallback.question) > 0.8) {
+          print('DEBUG: Detected likely fallback question: "${question.question.substring(0, math.min(30, question.question.length))}..."');
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+  
+  // Simple algorithm to calculate text similarity (0-1 scale)
+  double _calculateSimilarity(String text1, String text2) {
+    // Convert to lowercase for comparison
+    final a = text1.toLowerCase();
+    final b = text2.toLowerCase();
+    
+    // Very basic similarity check - can be enhanced in the future
+    if (a == b) return 1.0;
+    if (a.contains(b) || b.contains(a)) return 0.9;
+    
+    // Check for significant word overlap
+    final wordsA = a.split(' ').toSet();
+    final wordsB = b.split(' ').toSet();
+    
+    final intersection = wordsA.intersection(wordsB).length;
+    final union = wordsA.union(wordsB).length;
+    
+    return intersection / union;
+  }
+
   // Check if we need to refresh the daily quiz
   Future<bool> shouldRefreshDailyQuiz() async {
     try {

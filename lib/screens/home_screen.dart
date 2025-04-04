@@ -216,17 +216,29 @@ class _HomeContentState extends State<HomeContent> {
                             size: 40,
                           ),
                           const SizedBox(width: 10),
-                          const Text(
-                            'Penny Pilot',
-                            style: TextStyle(
-                              color: AppColors.lightest,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Penny Pilot',
+                                style: TextStyle(
+                                  color: AppColors.lightest,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Text(
+                                '-powered by Gemini',
+                                style: TextStyle(
+                                  color: AppColors.lightGrey,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const Icon(Icons.notifications, color: AppColors.lightest),
                     ],
                   ),
                   const SizedBox(height: 20),

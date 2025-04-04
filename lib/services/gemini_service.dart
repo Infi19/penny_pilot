@@ -25,10 +25,10 @@ class GeminiService {
       model: 'gemini-2.0-flash', // Using the faster model variant
       apiKey: apiKey,
       generationConfig: GenerationConfig(
-        temperature: 0.3, // Lower temperature for faster and more deterministic responses
-        topP: 0.7,
-        topK: 20, 
-        maxOutputTokens: 1000, // Increased from 600 to allow for more detailed responses
+        temperature: 0.7, // Increased temperature for more creative responses and variability
+        topP: 0.9,         // Increased to allow more diverse sampling
+        topK: 40,          // Increased to consider more tokens during generation
+        maxOutputTokens: 2000, // Increased to allow for longer outputs, especially for quiz questions
         stopSequences: ['\n\n\n'],
       ),
     );
@@ -235,10 +235,26 @@ Provide concise, personalized advice based on this context.
     }
   }
   
-  // Reset the chat session for a specific agent
+  // Reset all sessions to force new conversations
+  void resetAllSessions() {
+    print('DEBUG: GeminiService - Resetting all chat sessions');
+    _agentSessions.clear();
+    _responseCache.clear();
+    print('DEBUG: GeminiService - Cleared ${_responseCache.length} cached responses and all sessions');
+  }
+  
+  // Reset a specific session
   void resetSession(String agentType) {
     if (_agentSessions.containsKey(agentType)) {
       _agentSessions.remove(agentType);
+      print('DEBUG: Reset session for agent: $agentType');
+      
+      // Also clear relevant cache entries
+      final keysToRemove = _responseCache.keys.where((k) => k.startsWith('$agentType:')).toList();
+      for (var key in keysToRemove) {
+        _responseCache.remove(key);
+      }
+      print('DEBUG: Cleared ${keysToRemove.length} cached responses for $agentType');
     }
   }
   

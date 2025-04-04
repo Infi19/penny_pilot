@@ -13,16 +13,25 @@ A comprehensive mobile application for financial education, management, and AI-p
 - **Fraud Detective:** Helps identify and learn about financial fraud schemes
 - **Myth Buster:** Debunks financial myths and misconceptions
 - **Roadmap Guide:** Offers guidance on financial journeys
+- **Advanced AI Integration:** Google Gemini AI with enhanced caching, session management, and dynamic response generation
+
+### Financial Education Hub
+- **Daily Investment Quizzes:** Adaptive quizzes with difficulty levels (beginner, intermediate, advanced)
+- **Quiz Regeneration:** System automatically generates fresh questions for each difficulty level
+- **Leaderboard:** Track your progress against other users with a competitive leaderboard
+- **Educational Modules:** Learn about investment concepts and strategies (coming soon)
 
 ### User Profile & Goals
-- Create and manage personal financial profiles
-- Set and track financial goals
-- Receive personalized investment recommendations
+- **Risk Assessment:** Determine your investment risk profile
+- **Financial Health Score:** Comprehensive assessment of your financial well-being
+- **Goal Setting & Tracking:** Create and monitor financial targets with progress visualization
+- **Personalized Recommendations:** Receive tailored investment advice based on your profile
 
-### Financial Education
-- Learn about investment concepts and strategies
-- Understand market terminology
-- Access expert financial insights
+### UI/UX Features
+- **Clean, Modern Interface:** Dark mode design optimized for financial data presentation
+- **Real-time Updates:** Synchronized data across devices using Firebase
+- **Responsive Design:** Works on various screen sizes and orientations
+- **Intuitive Navigation:** Bottom navigation bar for easy access to key features
 
 ## 🔧 Technology Stack
 
@@ -33,6 +42,10 @@ A comprehensive mobile application for financial education, management, and AI-p
   - Storage
   - App Check (security)
 - **AI Integration:** Google Gemini AI
+  - Advanced prompt engineering
+  - Session management with unique identifiers
+  - Response caching for improved performance
+  - Custom response parsing for structured quiz data
 
 ## 📋 Requirements
 
@@ -54,6 +67,8 @@ A comprehensive mobile application for financial education, management, and AI-p
 2. Configure Firebase for your Flutter app:
    - Android: Add your app to Firebase, download `google-services.json` and place it in `android/app/`
    - iOS: Add your app to Firebase, download `GoogleService-Info.plist` and place it in `ios/Runner/`
+3. Enable Authentication, Firestore, and Storage services
+4. Set up appropriate security rules for Firestore and Storage
 
 ### Setting Up Gemini AI
 1. Get a Gemini API Key from [Google AI Studio](https://makersuite.google.com/app/apikey)
@@ -61,6 +76,10 @@ A comprehensive mobile application for financial education, management, and AI-p
    ```
    GEMINI_API_KEY=your_actual_api_key_here
    ```
+3. Configure API settings for optimal performance:
+   - Temperature: 0.7 (for creative quiz generation)
+   - MaxOutputTokens: 2000 (for comprehensive responses)
+   - TopK and TopP parameters for diverse content generation
 
 ### Installation
 1. Clone the repository:
@@ -86,11 +105,42 @@ lib/
 ├── main.dart              # Entry point
 ├── firebase_options.dart  # Firebase configuration
 ├── models/                # Data models
+│   ├── chat_message.dart  # AI assistant chat model
+│   ├── quiz_model.dart    # Quiz data structures
+│   └── ...                # Other data models
 ├── screens/               # UI screens
+│   ├── home_screen.dart   # Main dashboard
+│   ├── learn_screen.dart  # Education hub
+│   ├── quiz_screen.dart   # Quiz interface
+│   └── ...                # Other screens
 ├── services/              # Business logic and API services
+│   ├── gemini_service.dart    # AI model integration
+│   ├── quiz_service.dart      # Quiz generation and management
+│   ├── auth_service.dart      # User authentication
+│   └── ...                    # Other services
 ├── utils/                 # Utility functions and constants
+│   ├── app_colors.dart    # Color scheme
+│   └── ...                # Other utilities
 └── widgets/               # Reusable UI components
 ```
+
+## 🧠 AI Quiz System
+
+The app features an advanced quiz system powered by Google's Gemini AI:
+
+### Key Features
+- **Adaptive Difficulty:** Three levels (beginner, intermediate, advanced)
+- **Dynamic Generation:** Quizzes are generated based on user's knowledge level
+- **Anti-Caching Mechanisms:** Unique session IDs and timestamps ensure fresh content
+- **Fallback System:** Pre-defined questions available if AI generation fails
+- **Multiple Submission Prevention:** Users can only take one quiz per day (unless in debug mode)
+
+### Implementation Details
+- **Enhanced Prompting:** Structured prompts guide the AI to generate finance-focused questions
+- **JSON Parsing:** Robust parsing of AI-generated content into structured quiz format
+- **Error Handling:** Comprehensive error detection and graceful fallbacks
+- **Debugging Tools:** Hidden debugging features for development and testing
+- **Performance Optimization:** Caching strategies to minimize API calls
 
 ## 🔒 Security
 
@@ -108,29 +158,29 @@ await FirebaseAppCheck.instance.activate(
 - Follow [Flutter style guide](https://dart.dev/guides/language/effective-dart/style)
 - Write tests for new features
 - Use feature branches and pull requests for collaborative development
+- Debug mode provides special tools for testing (quiz regeneration, multiple submissions)
 
 ## 📈 Future Roadmap
 
-- Portfolio management tools
-- Integration with real financial institutions
-- Budgeting and expense tracking
-- Community features for financial discussion
+- **Enhanced Financial Education:** Structured learning modules with progress tracking
+- **Portfolio Guidance:** Real-time tracking and visualization of investments
+- **Fraud Alert System:** Real-time notifications about financial scams and fraudulent schemes
+- **Voice-Enabled AI Chat:** Interact with financial assistants using natural voice conversations
+- **Budgeting and Expense Tracking:** Comprehensive financial management tools
+- **Community Features:** Forums and discussion groups for peer learning
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
-
-This project is proprietary and confidential.
-
 ## 👥 Team
 
-- [Your Name/Team Members]
-- Contact: [Your Email]
+- **Segfault duo**
+  - Aditya Kanchan - [GitHub](https://github.com/adityakanchan)
+  - Pranav Suryavanshi - [GitHub](https://github.com/Infi19)
 
 ## 🙏 Acknowledgements
 
-- [Flutter](https://flutter.dev/)
-- [Firebase](https://firebase.google.com/)
-- [Google Generative AI](https://developers.generativeai.google/)
+- [Flutter](https://flutter.dev/) - [Documentation](https://docs.flutter.dev/)
+- [Firebase](https://firebase.google.com/) - [Documentation](https://firebase.google.com/docs)
+- [Google Generative AI](https://developers.generativeai.google/) - [Documentation](https://ai.google.dev/docs)

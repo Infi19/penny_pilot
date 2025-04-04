@@ -44,7 +44,18 @@ class LaunchScreen extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
+              
+              // Powered by Gemini text
+              const Text(
+                '-powered by Gemini',
+                style: TextStyle(
+                  color: AppColors.quaternary, // Light beige
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 4),
               
               // Subtitle
               const Text(

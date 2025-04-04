@@ -8,6 +8,7 @@ import 'user_level_settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
@@ -93,25 +94,14 @@ class _LearnScreenState extends State<LearnScreen> {
     return Stack(
       children: [
         Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            title: const Text('Financial Literacy Hub', 
-              style: TextStyle(color: AppColors.lightest),
-            ),
-            backgroundColor: AppColors.darkGrey,
-            iconTheme: const IconThemeData(color: AppColors.lightest),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Financial Literacy Hub', 
+          style: TextStyle(color: AppColors.lightest),
+        ),
+        backgroundColor: AppColors.darkGrey,
+        iconTheme: const IconThemeData(color: AppColors.lightest),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.history),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const QuizHistoryScreen(),
-                    ),
-                  );
-                },
-                tooltip: 'Quiz History',
-              ),
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _refreshData,
@@ -712,6 +702,42 @@ class _LearnScreenState extends State<LearnScreen> {
                 ),
               ),
             ),
+            
+          // Debug: Allow Multiple Quiz Submissions Button
+          if (false) // Hidden in production
+            InkWell(
+              onTap: _allowMultipleSubmissions,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.2),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(
+                      Icons.repeat,
+                      color: Colors.purple,
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'DEBUG: Allow Multiple Submissions',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -951,6 +977,107 @@ class _LearnScreenState extends State<LearnScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+  
+  // Debug method to allow multiple quiz submissions
+  Future<void> _allowMultipleSubmissions() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      print('DEBUG: Enabling multiple quiz submissions');
+      
+      // Show a snackbar to indicate the process has started
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Enabling multiple quiz submissions...'),
+            backgroundColor: Colors.purple,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      // Clear today's date from quiz results
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final String formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        print('DEBUG: Clearing quiz results for date: $formattedDate');
+        
+        // Delete today's quiz results from Firestore
+        final resultsQuery = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('quizResults')
+            .where('date', isEqualTo: formattedDate)
+            .get();
+            
+        // Batch delete all matching results
+        final batch = FirebaseFirestore.instance.batch();
+        int count = 0;
+        for (var doc in resultsQuery.docs) {
+          batch.delete(doc.reference);
+          count++;
+        }
+        
+        if (count > 0) {
+          await batch.commit();
+          print('DEBUG: Deleted $count quiz results for today');
+        } else {
+          print('DEBUG: No quiz results found for today');
+        }
+        
+        // Also clear the quiz completion flag in shared preferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('quiz_completed_$formattedDate');
+        print('DEBUG: Cleared quiz completion flag in SharedPreferences');
+        
+        // Reset the local quiz completion status
+        setState(() {
+          _quizCompleted = false;
+        });
+        
+        // Refresh data to update UI
+        await _refreshData();
+        
+        // Success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You can now take the quiz multiple times!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        print('DEBUG: User not logged in');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User not logged in'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('DEBUG: Error enabling multiple submissions: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
