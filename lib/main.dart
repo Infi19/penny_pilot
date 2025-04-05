@@ -14,6 +14,7 @@ import 'services/personalized_advice_service.dart';
 import 'services/quiz_service.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,10 +29,9 @@ void main() async {
   
   // Initialize Firebase App Check
   await FirebaseAppCheck.instance.activate(
-    // Use debug provider for development
-    // In production, you should use a proper provider
-    androidProvider: AndroidProvider.debug,
-    appleProvider: AppleProvider.debug,
+    // Use appropriate providers based on environment
+    androidProvider: kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
+    appleProvider: kReleaseMode ? AppleProvider.deviceCheck : AppleProvider.debug,
   );
 
   // Initialize services

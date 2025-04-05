@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -40,8 +41,8 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDxZyo8U5cCuueqOTLjRPlxr5T-eg7_V-E',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_API_KEY_WEB'] ?? '',
     appId: '1:238653971522:web:a910bab12cd6c5d6b0e1db',
     messagingSenderId: '238653971522',
     projectId: 'penny-pilot-88708',
@@ -50,16 +51,16 @@ class DefaultFirebaseOptions {
     measurementId: 'G-ZGWJZDX3M5',
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDrZ8zYWI3RQCbJrfyHQUuGXAVxwNTT2lo',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_API_KEY_ANDROID'] ?? '',
     appId: '1:238653971522:android:b18df50f4540eec3b0e1db',
     messagingSenderId: '238653971522',
     projectId: 'penny-pilot-88708',
     storageBucket: 'penny-pilot-88708.firebasestorage.app',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyB4iEnsRoOA_EiUWNKu6mDtis36zxyL5Gw',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_API_KEY_IOS'] ?? '',
     appId: '1:238653971522:ios:00813afd4eaab7d0b0e1db',
     messagingSenderId: '238653971522',
     projectId: 'penny-pilot-88708',
@@ -67,8 +68,8 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.pennypilot.pennyPilot',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyB4iEnsRoOA_EiUWNKu6mDtis36zxyL5Gw',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_API_KEY_IOS'] ?? '',
     appId: '1:238653971522:ios:00813afd4eaab7d0b0e1db',
     messagingSenderId: '238653971522',
     projectId: 'penny-pilot-88708',
@@ -76,8 +77,8 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.pennypilot.pennyPilot',
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDxZyo8U5cCuueqOTLjRPlxr5T-eg7_V-E',
+  static FirebaseOptions get windows => FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_API_KEY_WEB'] ?? '',
     appId: '1:238653971522:web:de81420ebafec580b0e1db',
     messagingSenderId: '238653971522',
     projectId: 'penny-pilot-88708',
