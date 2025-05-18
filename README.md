@@ -1,3 +1,4 @@
+** note we have shut down the firebase server so you wont be able to login into the app and use it
 # Penny Pilot
 
 <p align="center">
