@@ -27,7 +27,7 @@ android {
         applicationId = "com.penny_pilot.penny_pilot"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21  // Set minimum SDK to 21 for Firebase
+    minSdk = flutter.minSdkVersion  // Set minimum SDK to 21 for Firebase
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

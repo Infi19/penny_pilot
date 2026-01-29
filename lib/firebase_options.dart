@@ -53,10 +53,10 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get android => FirebaseOptions(
     apiKey: dotenv.env['FIREBASE_API_KEY_ANDROID'] ?? '',
-    appId: '1:238653971522:android:b18df50f4540eec3b0e1db',
-    messagingSenderId: '238653971522',
-    projectId: 'penny-pilot-88708',
-    storageBucket: 'penny-pilot-88708.firebasestorage.app',
+    appId: '1:443590070369:android:bafbe061e4e668d5b41a20',
+    messagingSenderId: '443590070369',
+    projectId: 'penny-pilot22',
+    storageBucket: 'penny-pilot22.firebasestorage.app',
   );
 
   static FirebaseOptions get ios => FirebaseOptions(

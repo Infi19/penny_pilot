@@ -22,7 +22,7 @@ class GeminiService {
     
     // Initialize the model with the API key - using gemini-flash for faster responses
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash', // Using the faster model variant
+      model: 'gemini-2.5-flash', // Using the faster model variant
       apiKey: apiKey,
       generationConfig: GenerationConfig(
         temperature: 0.7, // Increased temperature for more creative responses and variability

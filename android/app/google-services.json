@@ -1,26 +1,43 @@
 {
   "project_info": {
-    "project_number": "238653971522",
-    "project_id": "penny-pilot-88708",
-    "storage_bucket": "penny-pilot-88708.firebasestorage.app"
+    "project_number": "443590070369",
+    "project_id": "penny-pilot22",
+    "storage_bucket": "penny-pilot22.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:238653971522:android:b18df50f4540eec3b0e1db",
+        "mobilesdk_app_id": "1:443590070369:android:bafbe061e4e668d5b41a20",
         "android_client_info": {
           "package_name": "com.penny_pilot.penny_pilot"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "443590070369-s5kcdp66gb9hql22cf0mbtflni3fbd33.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDrZ8zYWI3RQCbJrfyHQUuGXAVxwNTT2lo"
+          "current_key": "AIzaSyDpZc7pYuOoG19hjXQd7eSyU5LUH5ScRBg"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "443590070369-s5kcdp66gb9hql22cf0mbtflni3fbd33.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "443590070369-cks2h50s5vh235uglvc1u0mh0itonn28.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pennypilot.pennyPilot"
+              }
+            }
+          ]
         }
       }
     }

@@ -20,6 +20,8 @@ import '../services/user_service.dart';
 import '../utils/currency_util.dart';
 import 'financial_health_result_screen.dart';
 import '../services/quiz_service.dart';
+import 'banking_messages_screen.dart';
+import 'expenses_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -288,6 +290,58 @@ class _HomeContentState extends State<HomeContent> {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const AIAssistantScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Banking Messages Card
+                  Card(
+                    color: AppColors.darkGrey,
+                    elevation: 4,
+                    child: ListTile(
+                      leading: const Icon(Icons.message, color: AppColors.lightest),
+                      title: const Text(
+                        'Banking Messages',
+                        style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'Track expenses from SMS',
+                        style: TextStyle(color: AppColors.lightGrey),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward, color: AppColors.lightest),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const BankingMessagesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Expenses Card
+                  Card(
+                    color: AppColors.darkGrey,
+                    elevation: 4,
+                    child: ListTile(
+                      leading: const Icon(Icons.receipt_long, color: AppColors.lightest),
+                      title: const Text(
+                        'Manage Expenses',
+                        style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'View and edit your history',
+                        style: TextStyle(color: AppColors.lightGrey),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward, color: AppColors.lightest),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ExpensesScreen(),
                           ),
                         );
                       },
