@@ -65,6 +65,32 @@ class MessageDetailDialog extends StatelessWidget {
           FilledButton.icon(
             onPressed: () async {
               try {
+                final expenseService = ExpenseService();
+                // Check duplicate
+                final isDuplicate = await expenseService.isDuplicateExpense(
+                  transaction!.amount, 
+                  transaction!.merchant, 
+                  transaction!.date
+                );
+
+                if (context.mounted && isDuplicate) {
+                   final shouldProceed = await showDialog<bool>(
+                     context: context,
+                     builder: (context) => AlertDialog(
+                       title: const Text('Possible Duplicate'),
+                       content: const Text('A transaction with this amount and merchant already exists for this date. Save anyway?'),
+                       actions: [
+                         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+                       ],
+                     ),
+                   );
+                   if (shouldProceed != true) return;
+                }
+
+                // Determine type based on transaction (Credit -> Income, Debit -> Expense)
+                final String type = transaction!.type == TransactionType.credit ? 'income' : 'expense';
+
                 // Initial category guess based on merchant names could go here
                 // For now, default to 'General' or let user edit later
                 final expense = Expense(
@@ -77,9 +103,10 @@ class MessageDetailDialog extends StatelessWidget {
                   notes: 'Auto-logged from SMS',
                   isAutoLogged: true,
                   originalMessage: message.body,
+                  type: type,
                 );
 
-                await ExpenseService().addExpense(expense);
+                await expenseService.addExpense(expense);
 
                 if (context.mounted) {
                    ScaffoldMessenger.of(context).showSnackBar(

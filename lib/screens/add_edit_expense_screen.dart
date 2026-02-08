@@ -20,11 +20,16 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   
   String _category = 'General';
   DateTime _selectedDate = DateTime.now();
+  String _type = 'expense'; // 'income' or 'expense'
   final ExpenseService _expenseService = ExpenseService();
   bool _isLoading = false;
 
-  final List<String> _categories = [
-    'General', 'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Travel'
+  final List<String> _expenseCategories = [
+    'General', 'Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Health', 'Travel', 'Rent', 'Education'
+  ];
+  
+  final List<String> _incomeCategories = [
+    'Salary', 'Freelance', 'Investment', 'Business', 'Gift', 'Other'
   ];
 
   @override
@@ -36,6 +41,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       _notesController.text = widget.expense!.notes;
       _category = widget.expense!.category;
       _selectedDate = widget.expense!.date;
+      _type = widget.expense!.type;
     }
   }
 
@@ -65,6 +71,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
         notes: _notesController.text,
         isAutoLogged: widget.expense?.isAutoLogged ?? false,
         originalMessage: widget.expense?.originalMessage,
+        type: _type,
       );
 
       if (widget.expense == null) {
@@ -76,7 +83,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving expense: $e')),
+        SnackBar(content: Text('Error saving: $e')),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -97,9 +104,14 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final categories = _type == 'expense' ? _expenseCategories : _incomeCategories;
+    if (!categories.contains(_category)) {
+      _category = categories.first;
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.expense == null ? 'Add Expense' : 'Edit Expense'),
+        title: Text(widget.expense == null ? 'Add Transaction' : 'Edit Transaction'),
       ),
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator()) 
@@ -109,12 +121,52 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    // Toggle Income / Expense
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'expense', label: Text('Expense'), icon: Icon(Icons.arrow_upward)),
+                        ButtonSegment(value: 'income', label: Text('Income'), icon: Icon(Icons.arrow_downward)),
+                      ],
+                      selected: {_type},
+                      onSelectionChanged: (Set<String> newSelection) {
+                        setState(() {
+                          _type = newSelection.first;
+                          // Reset category if not valid for new type
+                          if (_type == 'expense' && !_expenseCategories.contains(_category)) {
+                            _category = _expenseCategories.first;
+                          } else if (_type == 'income' && !_incomeCategories.contains(_category)) {
+                            _category = _incomeCategories.first;
+                          }
+                        });
+                      },
+                      style: ButtonStyle(
+                        backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                          (Set<MaterialState> states) {
+                            if (states.contains(MaterialState.selected)) {
+                              return _type == 'expense' ? Colors.red.withOpacity(0.2) : Colors.green.withOpacity(0.2);
+                            }
+                            return Colors.transparent;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
                     TextFormField(
                       controller: _amountController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Amount',
                         prefixText: '₹ ',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        labelStyle: TextStyle(
+                          color: _type == 'expense' ? Colors.red : Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: _type == 'expense' ? Colors.red : Colors.green,
+                        fontWeight: FontWeight.bold,
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {
@@ -127,19 +179,19 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                     TextFormField(
                       controller: _merchantController,
                       decoration: const InputDecoration(
-                        labelText: 'Merchant / Description',
+                        labelText: 'Description / Merchant',
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) => value!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: _categories.contains(_category) ? _category : 'General',
+                      value: categories.contains(_category) ? _category : categories.first,
                       decoration: const InputDecoration(
                         labelText: 'Category',
                         border: OutlineInputBorder(),
                       ),
-                      items: _categories.map((c) => DropdownMenuItem(
+                      items: categories.map((c) => DropdownMenuItem(
                         value: c,
                         child: Text(c),
                       )).toList(),
@@ -171,7 +223,10 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
                       height: 50,
                       child: FilledButton(
                         onPressed: _saveExpense,
-                        child: const Text('Save Expense'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _type == 'expense' ? Colors.red : Colors.green,
+                        ),
+                        child: const Text('Save'),
                       ),
                     ),
                   ],

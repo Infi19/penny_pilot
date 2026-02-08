@@ -10,6 +10,7 @@ class Expense {
   final String notes;
   final bool isAutoLogged;
   final String? originalMessage;
+  final String type; // 'income' or 'expense'
 
   Expense({
     required this.id,
@@ -21,6 +22,7 @@ class Expense {
     this.notes = '',
     this.isAutoLogged = false,
     this.originalMessage,
+    this.type = 'expense',
   });
 
   Map<String, dynamic> toMap() {
@@ -33,6 +35,7 @@ class Expense {
       'notes': notes,
       'isAutoLogged': isAutoLogged,
       'originalMessage': originalMessage,
+      'type': type,
     };
   }
 
@@ -47,6 +50,7 @@ class Expense {
       notes: map['notes'] ?? '',
       isAutoLogged: map['isAutoLogged'] ?? false,
       originalMessage: map['originalMessage'],
+      type: map['type'] ?? 'expense',
     );
   }
 }

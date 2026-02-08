@@ -32,7 +32,7 @@ class ExpenseService {
       return snapshot.docs.map((doc) {
         return Expense.fromMap(doc.id, doc.data());
       }).toList();
-    });
+    }).asBroadcastStream();
   }
 
   /// Delete an expense
@@ -45,5 +45,42 @@ class ExpenseService {
   Future<void> updateExpense(Expense expense) async {
     if (_userId == null) return;
     await _expensesRef(_userId!).doc(expense.id).update(expense.toMap());
+  }
+
+  /// Get total income
+  Stream<double> getTotalIncome() {
+     return getExpensesStream().map((expenses) {
+       return expenses
+           .where((e) => e.type == 'income')
+           .fold(0.0, (sum, e) => sum + e.amount);
+     });
+  }
+
+  /// Get total expenses
+  Stream<double> getTotalExpenses() {
+    return getExpensesStream().map((expenses) {
+      return expenses
+          .where((e) => e.type == 'expense')
+          .fold(0.0, (sum, e) => sum + e.amount);
+    });
+  }
+
+  /// Check for duplicate expense (same amount, merchant, date within threshold)
+  Future<bool> isDuplicateExpense(double amount, String merchant, DateTime date) async {
+    if (_userId == null) return false;
+    
+    // Check range: +/- 24 hours just in case of slight parsing diffs, OR exact date if preferred.
+    // For SMS, usually Date is precise. Let's check for same day.
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final query = await _expensesRef(_userId!)
+        .where('amount', isEqualTo: amount)
+        .where('merchant', isEqualTo: merchant)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('date', isLessThan: Timestamp.fromDate(endOfDay))
+        .get();
+
+    return query.docs.isNotEmpty;
   }
 }

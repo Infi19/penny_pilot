@@ -13,7 +13,6 @@ class AppColors {
   static const Color cardBackground = secondary;
   static const Color buttonColor = tertiary;
   static const Color accentColor = tertiary;
-  static const Color accent = tertiary; // Alias for consistency
   static const Color primaryText = quaternary;       // Text is light for contrast on dark backgrounds
   static const Color secondaryText = tertiary;       // Secondary text in teal
 

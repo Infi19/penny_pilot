@@ -22,6 +22,7 @@ import 'financial_health_result_screen.dart';
 import '../services/quiz_service.dart';
 import 'banking_messages_screen.dart';
 import 'expenses_screen.dart';
+import 'budget_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -323,29 +324,47 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Expenses Card
-                  Card(
-                    color: AppColors.darkGrey,
-                    elevation: 4,
-                    child: ListTile(
-                      leading: const Icon(Icons.receipt_long, color: AppColors.lightest),
-                      title: const Text(
-                        'Manage Expenses',
-                        style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'View and edit your history',
-                        style: TextStyle(color: AppColors.lightGrey),
-                      ),
-                      trailing: const Icon(Icons.arrow_forward, color: AppColors.lightest),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const ExpensesScreen(),
+                  // Expenses & Budgets Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Card(
+                          color: AppColors.darkGrey,
+                          child: InkWell(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExpensesScreen())),
+                            child: const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.receipt_long, color: AppColors.lightest, size: 32),
+                                  SizedBox(height: 8),
+                                  Text('Expenses', style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Card(
+                          color: AppColors.darkGrey,
+                          child: InkWell(
+                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BudgetScreen())),
+                            child: const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.savings, color: AppColors.lightest, size: 32),
+                                  SizedBox(height: 8),
+                                  Text('Budgets', style: TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
