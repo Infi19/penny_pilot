@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'dart:async';
 import '../models/chat_message.dart';
 import '../utils/app_colors.dart';
@@ -364,6 +365,18 @@ class _ChatUIState extends State<ChatUI> {
         'Prioritizing financial goals',
         'Adjusting plans as circumstances change',
       ];
+    } else if (widget.agentType == 'assistant') { // Unified Assistant
+      agentName = 'Penny Pilot Assistant';
+      welcomeMessage = 'Hello! I\'m Penny Pilot, your all-in-one financial assistant.';
+      hintText = 'I can help you with:';
+      suggestions = [
+        'Analyzing your spending patterns and trends',
+        'Identifying financial scams',
+        'Busting financial myths',
+        'Creating financial roadmaps',
+        'Try asking: "How is my spending this month?"',
+        'Try asking: "Is this message a scam?"',
+      ];
     }
     
     return SingleChildScrollView(
@@ -431,6 +444,7 @@ class _ChatUIState extends State<ChatUI> {
 
   IconData _getAgentIcon() {
     switch (widget.agentType) {
+      case 'assistant': return Icons.smart_toy;
       case 'personal': return Icons.auto_awesome;
       case 'fraud': return Icons.security;
       case 'mythbusting': return Icons.lightbulb;
@@ -441,6 +455,7 @@ class _ChatUIState extends State<ChatUI> {
 
   Color _getAgentColor() {
     switch (widget.agentType) {
+      case 'assistant': return AppColors.primary;
       case 'personal': return Colors.deepPurple;
       case 'fraud': return Colors.red;
       case 'mythbusting': return Colors.amber;
@@ -680,6 +695,8 @@ class _ChatUIState extends State<ChatUI> {
   Widget _buildMarkdownBody(String content) {
     return MarkdownBody(
       data: content,
+      selectable: true,
+      extensionSet: md.ExtensionSet.gitHubFlavored,
       styleSheet: MarkdownStyleSheet(
         h1: const TextStyle(
           fontSize: 20,  // Reduced font size

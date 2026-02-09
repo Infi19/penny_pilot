@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:collection';
 import 'dart:math' as math;
+import 'scam_detection_service.dart';
 
 class GeminiService {
   static GeminiService? _instance;
@@ -167,6 +168,21 @@ class GeminiService {
   String _formatUserContext(Map<String, dynamic> context) {
     final buffer = StringBuffer();
     
+    // Spending Context
+    final spending = context['spending'];
+    if (spending != null) {
+      buffer.writeln('SPENDING (${spending['month']}):');
+      buffer.writeln('Total: ₹${spending['currentMonthTotal']} (Last Month: ₹${spending['lastMonthTotal']})');
+      
+      final trends = spending['trends'] as List?;
+      if (trends != null && trends.isNotEmpty) {
+        buffer.writeln('TRENDS:');
+        for (var trend in trends.take(5)) { // Top 5 categories
+           buffer.writeln('- ${trend['category']}: ₹${trend['currentAmount']} (${(trend['percentChange'] as double).toStringAsFixed(1)}%)');
+        }
+      }
+    }
+
     // Risk Profile - simplified
     final riskProfile = context['riskProfile'];
     if (riskProfile != null) {
@@ -190,6 +206,16 @@ class GeminiService {
       for (var goal in goals) {
         buffer.writeln('- ${goal['name']}: ${goal['progress'].toStringAsFixed(0)}% complete, ' +
                       '${goal['daysRemaining']} days left');
+      }
+    }
+    
+    // Budgets
+    final budgets = context['budgets'] as List?;
+    if (budgets != null && budgets.isNotEmpty) {
+      buffer.writeln('BUDGETS:');
+      for (var budget in budgets) {
+        buffer.writeln('- ${budget['category']}: ₹${(budget['limit'] as double).toStringAsFixed(0)} limit, ' +
+                       '₹${(budget['spent'] as double).toStringAsFixed(0)} spent (${(budget['percentUsed'] as double).toStringAsFixed(0)}%)');
       }
     }
     
@@ -261,14 +287,20 @@ Provide concise, personalized advice based on this context.
   // Get a compact system prompt optimized for speed
   String _getCompactSystemPrompt(String agentType) {
     switch (agentType) {
+      case 'assistant':
+        return 'You are Penny Pilot, an all-in-one financial assistant for coaching, fraud detection, and planning.';
       case 'personal':
-        return 'You are a Smart Finance Advisor. Provide personalized advice based on financial data.';
+        return 'You are an AI Financial Coach. Help users understand spending patterns.';
       case 'fraud':
         return 'You are a Fraud Detective. Help identify and avoid financial scams.';
       case 'mythbusting':
         return 'You are a Financial Myth Buster. Debunk financial misconceptions.';
       case 'roadmap':
         return 'You are a Roadmap Guide. Create financial plans to reach goals.';
+      case 'financial_summary':
+        return 'You are a Financial Summary Generator. Summarize spending without advice.';
+      case 'scam_explanation':
+        return 'You are a Scam Explanation Assistant. Explain why a message is flagged as suspicious.';
       default:
         return 'You are a helpful AI assistant for financial topics.';
     }
@@ -279,12 +311,35 @@ Provide concise, personalized advice based on this context.
     const basePrompt = 'You are an AI assistant specialized in financial services. ';
     
     switch (agentType) {
+      case 'assistant':
+        return basePrompt + 'You are Penny Pilot, an all-in-one AI Financial Assistant. '
+          'Your goal is to help users with ALL their financial needs, including: '
+          '1. Financial Coaching: Analyze spending patterns and provide insights (requires user context). '
+          '2. Fraud Detection: Identify potential scams and explain why a message might be suspicious. '
+          '3. Myth Busting: Correct financial misconceptions with facts. '
+          '4. Roadmap Planning: Create structured financial plans for goals. '
+          '5. General Finance: Answer questions about investment concepts, banking, etc. '
+          '\n'
+          'Guidelines: '
+          '- Always be helpful, neutral, and educational. '
+          '- NEVER give specific investment advice (e.g., "Buy stock X"). '
+          '- Use Indian Rupee symbol (₹) for ALL currency values. '
+          '- If the user asks about their own data, use the provided USER CONTEXT. '
+          '- If the user shares a suspicious message, analyze it for fraud indicators. '
+          '- Response style: Clear, concise, using Markdown (bold, bullet points). ';
+
       case 'personal':
-        return basePrompt + 'You are a highly knowledgeable and strategic Personal Finance Advisor. '
-          'Your role is to provide expert yet personalized financial advice based on the user\'s financial profile. '
-          'Analyze their income, expenses, goals, and risk tolerance to recommend tailored investment strategies, budgeting plans, '
-          'and financial improvements. Prioritize factual accuracy, simplicity, and actionable recommendations. '
-          'Use short, precise responses while explaining complex financial terms in an easy-to-understand manner.';
+        return basePrompt + 'You are an AI Financial Coach, not a financial advisor. '
+          'Your purpose is to help users understand their own spending behavior and financial patterns using the data provided. '
+          'You must explain, summarize, and reflect insights. You must never give investment advice, predictions, or instructions to buy, sell, or invest. '
+          'Strictly Disallowed: Recommend specific financial products, Suggest buying, selling, or investing, Predict future expenses or returns, Use of Dollar symbol (\$). '
+          'Response Structure (MANDATORY): '
+          '1. Direct Answer: Clear, simple explanation using the data. '
+          '2. Supporting Observations: 2-3 bullet points referencing spending categories or trends. '
+          '3. Behavioral Insight (Optional): A neutral explanation of possible behavior (e.g., timing, frequency). '
+          '4. Gentle Reflection: A non-advisory closing line that encourages awareness, not action. '
+          'Tone: Neutral, Supportive, Non-judgmental. Avoid technical jargon and judgmental phrases. '
+          'Formatting: Use Indian Rupee symbol (₹) for ALL currency values. Never use \$. Use standard Markdown for formatting (e.g., **bold**, # Header). Ensure there is a space after the # for headers.';
           
       case 'fraud':
         return basePrompt + 'You are a Fraud Detection Assistant, specializing in financial scam awareness and prevention. '
@@ -304,9 +359,94 @@ Provide concise, personalized advice based on this context.
           'Ask users about their financial goals (buying a house, saving for education, retirement planning) and create step-by-step savings, investment, and budgeting strategies. '
           'Use data-driven insights to estimate timelines and suggest optimized approaches for faster goal achievement. '
           'Be adaptive—consider user preferences, risk tolerance, and financial constraints when designing roadmaps.';
-          
+
+
+      case 'financial_summary':
+        return 'System Role: You are a Financial Summary Generator. '
+               'Your task is to generate a clear, human-readable monthly financial summary based only on the user’s historical expense data provided. '
+               'You are not a financial advisor. '
+               '1. Objective: Convert raw expense analytics into a simple, friendly monthly narrative that helps the user understand where money was spent, what changed compared to the previous month, and notable spending patterns. '
+               '2. Allowed Behavior: Summarize spending by category, Highlight increases and decreases, Mention timing patterns (weekends, weekdays), Describe recurring or frequent expenses, Use neutral, observational language. '
+               '3. Strictly Disallowed: You MUST NOT Give financial advice, Suggest actions (“you should”, “try to”), Predict future spending, Recommend investments or savings plans. If advice is implied, rephrase as observation only. '
+               '4. Output Structure: '
+               '   ### Monthly Overview (1-2 sentences on total spend and change) '
+               '   ### Category Highlights (2-4 bullet points on major changes) '
+               '   ### Spending Patterns (Short paragraph on timing/behavior) '
+               '   ### Closing Reflection (Neutral, non-advisory reflection encouraging awareness) '
+               '5. Tone: Simple, Friendly, Non-judgmental, No technical jargon. '
+               '6. Formatting: Use Indian Rupee symbol (₹) for all currency values.';
+
+      case 'scam_explanation':
+        return 'System Role: You are a Scam Explanation Assistant. '
+               'Your task is to explain why a message was flagged as suspicious or potentially a scam based on detection signals provided. '
+               'You do not detect scams yourself. You only explain the output of an existing on-device ML model. '
+               '1. Objective: Convert technical scam-detection signals into a simple, human-readable explanation so users understand why a message looks risky. '
+               '2. Input You Will Receive: Scam classification result, Confidence score, Detected indicators (Urgent language, Suspicious links, etc.), Original Message. '
+               '3. Allowed Behavior: Explain common scam patterns, Explain why indicators are risky, Educate the user, Use neutral, non-alarming language. '
+               '4. Strictly Disallowed: You MUST NOT Claim the message is definitely a scam, Use fear-inducing language, Instruct the user to take specific actions, Ask the user to click, block, or report. Avoid words like \"confirmed fraud\", \"guaranteed scam\". '
+               '5. Required Response Structure: '
+               '   ### Why this message was flagged (Clear explanation using detected indicators) '
+               '   ### What this means (Short educational explanation of why such patterns are risky) '
+               '   ### Important note (Calm disclaimer stating the result is AI-based and informational) '
+               '6. Tone: Calm, Reassuring, Non-judgmental, Easy to understand.';
+
       default:
         return basePrompt + 'You are a general financial advisor. Provide clear, accurate, and helpful financial guidance.';
+    }
+  }
+
+  /// Generate a Monthly Financial Summary
+  Future<String> generateMonthlyFinancialSummary(Map<String, dynamic> data) async {
+     try {
+       final session = getOrCreateSession('financial_summary');
+       
+       final buffer = StringBuffer();
+       buffer.writeln("Month: ${data['month']}");
+       buffer.writeln("Total Spend: ₹${data['totalSpend']}");
+       buffer.writeln("Previous Month: ₹${data['previousMonthTotal']}");
+       buffer.writeln("Category Breakdown:");
+       for (var item in data['categoryBreakdown']) {
+         buffer.writeln("- ${item['category']}: ₹${item['amount']} (${(item['percentChange'] as double).toStringAsFixed(1)}%)");
+       }
+       buffer.writeln("High Spend Days: ${data['highSpendDays']}");
+       
+       final prompt = buffer.toString();
+       print('DEBUG: Sending financial summary request: $prompt');
+       
+       final response = await session.sendMessage(Content.text(prompt));
+       return response.text ?? "Unable to generate summary.";
+     } catch (e) {
+       print('Error generating financial summary: $e');
+       return "Error generating summary: $e";
+     }
+  }
+
+  /// Generate an explanation for a flagged scam message
+  Future<String> explainScamMessage(ScamResult result, String originalMessage) async {
+    try {
+      final session = getOrCreateSession('scam_explanation');
+      
+      final buffer = StringBuffer();
+      buffer.writeln("Classification: ${result.risk.name.toUpperCase()}");
+      buffer.writeln("Confidence: ${result.confidence.toStringAsFixed(2)}");
+      buffer.writeln("Indicators:");
+      if (result.indicators.isEmpty) {
+         buffer.writeln("- Unknown indicators");
+      } else {
+         for (var indicator in result.indicators) {
+           buffer.writeln("- $indicator");
+         }
+      }
+      buffer.writeln("Original Message Body: \"$originalMessage\"");
+      
+      final prompt = buffer.toString();
+      print('DEBUG: Sending scam explanation request: $prompt');
+      
+      final response = await session.sendMessage(Content.text(prompt));
+      return response.text ?? "Unable to generate explanation.";
+    } catch (e) {
+      print('Error generating scam explanation: $e');
+      return "Error generating explanation: $e";
     }
   }
 } 

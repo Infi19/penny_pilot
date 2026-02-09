@@ -8,6 +8,9 @@ import 'risk_profile_service.dart';
 import 'financial_goals_service.dart';
 import 'financial_health_service.dart';
 import 'user_service.dart';
+import 'expense_service.dart';
+import 'budget_service.dart';
+import '../utils/expense_model.dart';
 
 class PersonalizedAdviceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -16,6 +19,8 @@ class PersonalizedAdviceService {
   final FinancialGoalsService _goalsService = FinancialGoalsService();
   final FinancialHealthService _healthService = FinancialHealthService();
   final UserService _userService = UserService();
+  final ExpenseService _expenseService = ExpenseService();
+  final BudgetService _budgetService = BudgetService();
   
   // Cache to store user financial context for the session
   Map<String, dynamic>? _cachedUserContext;
@@ -37,17 +42,31 @@ class PersonalizedAdviceService {
         throw 'User not authenticated';
       }
       
+      final now = DateTime.now();
+      final startOfCurrentMonth = DateTime(now.year, now.month, 1);
+      final endOfCurrentMonth = DateTime(now.year, now.month + 1, 0);
+      
+      final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
+      final endOfLastMonth = DateTime(now.year, now.month, 0);
+
       // Execute all requests in parallel for better performance
       final userProfileFuture = _userService.getUserProfile(user.uid);
       final riskProfileFuture = _riskService.getRiskProfile(user.uid);
       final goalsFuture = _goalsService.getUserGoals();
       final healthScoreFuture = _healthService.getLatestHealthScore();
+      final currentMonthExpensesFuture = _expenseService.getExpensesInPeriod(startOfCurrentMonth, endOfCurrentMonth);
+      final lastMonthExpensesFuture = _expenseService.getExpensesInPeriod(startOfLastMonth, endOfLastMonth);
+      final budgetsFuture = _budgetService.getUserBudgets();
       
       // Await results individually to handle types correctly
       final userProfile = await userProfileFuture;
       final riskProfile = await riskProfileFuture;
       final goals = await goalsFuture;
       final healthScore = await healthScoreFuture;
+      final budgets = await budgetsFuture;
+      // Filter for expenses only
+      final currentMonthExpenses = (await currentMonthExpensesFuture).where((e) => e.type == 'expense').toList();
+      final lastMonthExpenses = (await lastMonthExpensesFuture).where((e) => e.type == 'expense').toList();
       
       // Calculate summary metrics for personalization
       List<Map<String, dynamic>> goalsSummary = [];
@@ -61,11 +80,59 @@ class PersonalizedAdviceService {
           'isCompleted': goal.isCompleted,
         });
       }
+
+      // Process Spending Data
+      double currentMonthTotal = currentMonthExpenses.fold(0, (sum, e) => sum + e.amount);
+      double lastMonthTotal = lastMonthExpenses.fold(0, (sum, e) => sum + e.amount);
+      
+      Map<String, double> currentCategoryTotals = {};
+      for (var e in currentMonthExpenses) {
+        currentCategoryTotals[e.category] = (currentCategoryTotals[e.category] ?? 0) + e.amount;
+      }
+      
+      Map<String, double> lastCategoryTotals = {};
+      for (var e in lastMonthExpenses) {
+        lastCategoryTotals[e.category] = (lastCategoryTotals[e.category] ?? 0) + e.amount;
+      }
+      
+      List<Map<String, dynamic>> categoryTrends = [];
+      currentCategoryTotals.forEach((category, amount) {
+          double lastAmount = lastCategoryTotals[category] ?? 0;
+          double percentChange = lastAmount > 0 ? ((amount - lastAmount) / lastAmount) * 100 : 100;
+          categoryTrends.add({
+              'category': category,
+              'currentAmount': amount,
+              'lastAmount': lastAmount,
+              'percentChange': percentChange,
+          });
+      });
+      // Sort by current amount descending
+      categoryTrends.sort((a, b) => (b['currentAmount'] as double).compareTo(a['currentAmount'] as double));
+
+      // Process Budgets
+      List<Map<String, dynamic>> budgetSummary = [];
+      for (var budget in budgets) {
+        double spent = currentCategoryTotals[budget.category] ?? 0.0;
+        budgetSummary.add({
+          'category': budget.category,
+          'limit': budget.limitAmount,
+          'spent': spent,
+          'remaining': budget.limitAmount - spent,
+          'percentUsed': (spent / budget.limitAmount) * 100,
+        });
+      }
       
       // Format the financial context in a structure suitable for AI consumption
       final Map<String, dynamic> context = {
         'userProfile': userProfile ?? {},
         'financialGoals': goalsSummary,
+        'budgets': budgetSummary,
+        'spending': {
+            'month': '${now.month}/${now.year}',
+            'currentMonthTotal': currentMonthTotal,
+            'lastMonthTotal': lastMonthTotal,
+            'trends': categoryTrends,
+        }
       };
       
       // Add risk profile if available

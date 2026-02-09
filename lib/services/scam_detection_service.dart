@@ -93,7 +93,27 @@ class ScamDetectionService {
           reason = "Analysis inconclusive.";
       }
       
-      return ScamResult(risk: risk, confidence: maxProb, reason: reason);
+      // Populate indicators using heuristics even if model was used, 
+      // because the model only gives a probability score.
+      List<String> indicators = [];
+      if (risk != ScamRisk.safe) {
+         // Re-run simple heuristic check to find *why* it might be suspicious for valid explanation
+         // This is a hybrid approach: Model gives score, Heuristics give explanation keywords/indicators
+         final heuristicResult = _fallbackAnalysis(text);
+         indicators = heuristicResult.indicators;
+         
+         // If heuristics didn't find anything but model says scam, add generic indicator
+         if (indicators.isEmpty) {
+           indicators.add("AI Model Detection");
+         }
+      }
+      
+      return ScamResult(
+        risk: risk, 
+        confidence: maxProb, 
+        reason: reason,
+        indicators: indicators
+      );
       
     } catch (e) {
       print('ScamDetectionService: Inference error: $e');
@@ -151,47 +171,56 @@ class ScamDetectionService {
         sequence.add(0.0);
       }
     }
-    
-    return sequence;
+        return sequence;
   }
 
   /// Fallback heuristic analysis if model is missing or fails
   ScamResult _fallbackAnalysis(String text) {
     String lowerText = text.toLowerCase();
+    List<String> detectedIndicators = [];
     
     // High Risk Keywords
-    if (lowerText.contains("urgent") || 
-        lowerText.contains("immediately") || 
-        lowerText.contains("suspended") ||
-        lowerText.contains("blocked") ||
-        (lowerText.contains("click") && lowerText.contains("link")) || 
-        lowerText.contains("verify kyc")) {
-      
-      return ScamResult(
-        risk: ScamRisk.high,
-        confidence: 0.85,
-        reason: "Contains urgent language or suspicious links often used in scams."
-      );
+    if (lowerText.contains("urgent") || lowerText.contains("immediately")) {
+      detectedIndicators.add("Urgent language");
+    }
+    if (lowerText.contains("suspended") || lowerText.contains("blocked")) {
+      detectedIndicators.add("Threatening language (account status)");
+    }
+    if (lowerText.contains("click") && lowerText.contains("link")) {
+      detectedIndicators.add("Suspicious request to click link");
+    }
+    if (lowerText.contains("verify kyc") || lowerText.contains("verify account")) {
+      detectedIndicators.add("Request for account verification");
     }
 
     // Suspicious Keywords
-    if (lowerText.contains("winner") || 
-        lowerText.contains("lottery") || 
-        lowerText.contains("prize") || 
-        lowerText.contains("claim") ||
-        lowerText.contains("refund")) {
-        
-      return ScamResult(
-        risk: ScamRisk.suspicious,
-        confidence: 0.65,
-        reason: "Contains promotional language or unrealistic offers."
+    if (lowerText.contains("winner") || lowerText.contains("lottery") || lowerText.contains("prize")) {
+      detectedIndicators.add("Unrealistic offer (prize/lottery)");
+    }
+    if (lowerText.contains("claim") || lowerText.contains("refund")) {
+      detectedIndicators.add("Request to claim funds");
+    }
+
+    if (detectedIndicators.isNotEmpty) {
+       // Determine risk based on indicators
+       ScamRisk risk = ScamRisk.suspicious;
+       if (detectedIndicators.any((i) => i.contains("Urgent") || i.contains("Threatening") || i.contains("verify"))) {
+         risk = ScamRisk.high;
+       }
+       
+       return ScamResult(
+        risk: risk,
+        confidence: risk == ScamRisk.high ? 0.85 : 0.65,
+        reason: "Detected: ${detectedIndicators.join(', ')}",
+        indicators: detectedIndicators,
       );
     }
 
     return ScamResult(
       risk: ScamRisk.safe,
       confidence: 0.95,
-      reason: "No suspicious patterns detected."
+      reason: "No suspicious patterns detected.",
+      indicators: [],
     );
   }
 }
@@ -200,10 +229,12 @@ class ScamResult {
   final ScamRisk risk;
   final double confidence;
   final String reason;
+  final List<String> indicators;
 
   ScamResult({
     required this.risk,
     required this.confidence,
     required this.reason,
+    this.indicators = const [],
   });
 }

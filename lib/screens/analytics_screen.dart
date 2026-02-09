@@ -3,6 +3,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../utils/app_colors.dart';
 import '../services/analytics_service.dart';
+import '../services/gemini_service.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class AnalyticsView extends StatelessWidget {
   const AnalyticsView({super.key});
@@ -16,9 +18,84 @@ class AnalyticsView extends StatelessWidget {
           _buildCategoryPieChart(),
           const SizedBox(height: 24),
           _buildWeeklyTrendChart(),
+          const SizedBox(height: 24),
+          _buildGenerateSummaryButton(context),
         ],
       ),
     );
+  }
+
+  Widget _buildGenerateSummaryButton(BuildContext context) {
+    return Center(
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.summarize, color: Colors.white),
+        label: const Text("Generate Monthly Summary", style: TextStyle(color: Colors.white)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+        onPressed: () => _generateAndShowSummary(context),
+      ),
+    );
+  }
+
+  Future<void> _generateAndShowSummary(BuildContext context) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final analyticsService = AnalyticsService();
+      final geminiService = GeminiService();
+
+      // 1. Get Data
+      final data = await analyticsService.getMonthlySummaryData(DateTime.now());
+      
+      // 2. Generate Summary
+      final summary = await geminiService.generateMonthlyFinancialSummary(data);
+
+      // Close loading
+      if (context.mounted) Navigator.pop(context);
+
+      // Show Result
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.darkGrey,
+            title: const Text("Monthly Financial Summary", style: TextStyle(color: Colors.white)),
+            content: SingleChildScrollView(
+              child: MarkdownBody(
+                data: summary,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(color: AppColors.lightest),
+                  h1: const TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                  h2: const TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                  h3: const TextStyle(color: AppColors.lightest, fontWeight: FontWeight.bold),
+                  listBullet: const TextStyle(color: AppColors.lightest),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Close"),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context); // Close loading
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    }
   }
 
   Widget _buildCategoryPieChart() {

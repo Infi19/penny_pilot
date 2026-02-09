@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import 'package:intl/intl.dart';
+import '../utils/app_colors.dart';
 import '../services/sms_service.dart';
 import '../logic/transaction_parser.dart';
 import 'widgets/message_detail_dialog.dart';
@@ -64,13 +65,16 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Banking Messages'),
+        backgroundColor: AppColors.darkest,
+        foregroundColor: AppColors.lightest,
         actions: [
           IconButton(
             icon: Icon(_showScamAlerts ? Icons.shield : Icons.shield_outlined),
             tooltip: _showScamAlerts ? 'Disable Scam Alerts' : 'Enable Scam Alerts',
-            color: _showScamAlerts ? Colors.green : null,
+            color: _showScamAlerts ? Colors.green : AppColors.lightest,
             onPressed: () {
               setState(() {
                 _showScamAlerts = !_showScamAlerts;
@@ -100,20 +104,22 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.sms_failed, size: 64, color: Colors.grey),
+            const Icon(Icons.sms_failed, size: 64, color: AppColors.lightGrey),
             const SizedBox(height: 16),
             const Text(
               'SMS Permission Needed',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.lightest),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 32.0, vertical: 8.0),
               child: Text(
                 'To view your banking transactions, we need access to your SMS messages. We only process banking-related messages locally on your device.',
                 textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.lightGrey),
               ),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.buttonColor, foregroundColor: AppColors.darkest),
               onPressed: _loadMessages,
               child: const Text('Grant Permission'),
             ),
@@ -127,9 +133,9 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.assignment_turned_in_outlined, size: 64, color: Colors.grey),
+            Icon(Icons.assignment_turned_in_outlined, size: 64, color: AppColors.lightGrey),
             SizedBox(height: 16),
-            Text('No banking messages found'),
+            Text('No banking messages found', style: TextStyle(color: AppColors.lightGrey)),
           ],
         ),
       );
@@ -164,6 +170,7 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
         }
 
         return Card(
+          color: AppColors.darkGrey,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           shape: _showScamAlerts && scamResult != null && scamResult.risk != ScamRisk.safe 
               ? RoundedRectangleBorder(
@@ -174,15 +181,15 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: transaction != null 
-                  ? (transaction.type == TransactionType.credit ? Colors.green.shade100 : Colors.red.shade100)
-                  : Colors.grey.shade200,
+                  ? (transaction.type == TransactionType.credit ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1))
+                  : AppColors.background,
               child: Icon(
                 transaction != null 
                     ? (transaction.type == TransactionType.credit ? Icons.arrow_downward : Icons.arrow_upward)
                     : Icons.message,
                 color: transaction != null 
                     ? (transaction.type == TransactionType.credit ? Colors.green : Colors.red)
-                    : Colors.grey,
+                    : AppColors.lightGrey,
               ),
             ),
             title: Row(
@@ -190,7 +197,7 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
                 Expanded(
                   child: Text(
                     message.address ?? 'Unknown Sender',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.lightest),
                   ),
                 ),
                 if (_showScamAlerts && statusIcon != null)
@@ -206,20 +213,20 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
                 if (transaction != null)
                   Text(
                     '${transaction.merchant} • ${NumberFormat.simpleCurrency(locale: 'en_IN').format(transaction.amount)}',
-                    style: const TextStyle(color: Colors.black87),
+                    style: const TextStyle(color: AppColors.lightest),
                   ),
                 Text(
                   message.body ?? '',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: const TextStyle(color: AppColors.lightGrey, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   message.date != null 
                       ? DateFormat('MMM d, h:mm a').format(message.date!)
                       : '',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                  style: TextStyle(color: AppColors.lightGrey.withOpacity(0.7), fontSize: 10),
                 ),
               ],
             ),

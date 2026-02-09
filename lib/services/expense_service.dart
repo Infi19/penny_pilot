@@ -83,4 +83,16 @@ class ExpenseService {
 
     return query.docs.isNotEmpty;
   }
+  /// Get expenses for a specific period
+  Future<List<Expense>> getExpensesInPeriod(DateTime start, DateTime end) async {
+    if (_userId == null) return [];
+
+    final query = await _expensesRef(_userId!)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('date', descending: true)
+        .get();
+
+    return query.docs.map((doc) => Expense.fromMap(doc.id, doc.data())).toList();
+  }
 }

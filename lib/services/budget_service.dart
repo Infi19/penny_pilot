@@ -42,6 +42,19 @@ class BudgetService {
     });
   }
 
+  /// Get all budgets as a Future List
+  Future<List<Budget>> getUserBudgets() async {
+    if (_userId == null) return [];
+    
+    try {
+      final snapshot = await _budgetsRef(_userId!).get();
+      return snapshot.docs.map((doc) => Budget.fromMap(doc.id, doc.data())).toList();
+    } catch (e) {
+      print('Error getting user budgets: $e');
+      return [];
+    }
+  }
+
   /// Delete a budget
   Future<void> deleteBudget(String budgetId) async {
     if (_userId == null) return;

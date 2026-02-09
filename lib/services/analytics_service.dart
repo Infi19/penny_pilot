@@ -56,4 +56,82 @@ class AnalyticsService {
       return trend; // logic to be refined in UI to ensure all days present
     });
   }
+
+  /// Gather data for Monthly Financial Summary
+  Future<Map<String, dynamic>> getMonthlySummaryData(DateTime month) async {
+    // 1. Get all expenses
+    final allExpenses = await _expenseService.getExpensesStream().first;
+    
+    // 2. Filter for Target Month and Previous Month
+    final targetMonthExpenses = <Expense>[];
+    final prevMonthExpenses = <Expense>[];
+    
+    final prevMonthDate = DateTime(month.year, month.month - 1);
+    final nextMonthDate = DateTime(month.year, month.month + 1);
+
+    for (var e in allExpenses) {
+      if (e.type != 'expense') continue;
+
+      if (e.date.year == month.year && e.date.month == month.month) {
+        targetMonthExpenses.add(e);
+      } else if (e.date.year == prevMonthDate.year && e.date.month == prevMonthDate.month) {
+        prevMonthExpenses.add(e);
+      }
+    }
+
+    // 3. Calculate Totals
+    double totalSpend = targetMonthExpenses.fold(0, (sum, e) => sum + e.amount);
+    double prevTotalSpend = prevMonthExpenses.fold(0, (sum, e) => sum + e.amount);
+
+    // 4. Category Breakdown & Patterns
+    final categoryTotals = <String, double>{};
+    final dayOfWeekTotals = <int, double>{}; // 1=Mon, 7=Sun
+
+    for (var e in targetMonthExpenses) {
+      categoryTotals[e.category] = (categoryTotals[e.category] ?? 0) + e.amount;
+      dayOfWeekTotals[e.date.weekday] = (dayOfWeekTotals[e.date.weekday] ?? 0) + e.amount;
+    }
+
+    // Calculate % change per category (simplified, comparing to prev month same category)
+    // Note: This requires prev month category data too.
+    final prevCategoryTotals = <String, double>{};
+    for (var e in prevMonthExpenses) {
+      prevCategoryTotals[e.category] = (prevCategoryTotals[e.category] ?? 0) + e.amount;
+    }
+
+    final categoryBreakdown = <Map<String, dynamic>>[];
+    categoryTotals.forEach((cat, amount) {
+      final prevAmount = prevCategoryTotals[cat] ?? 0;
+      double percentChange = 0.0;
+      if (prevAmount > 0) {
+        percentChange = ((amount - prevAmount) / prevAmount) * 100;
+      } else if (amount > 0) {
+         percentChange = 100.0; // New expense
+      }
+      
+      categoryBreakdown.add({
+        'category': cat,
+        'amount': amount,
+        'percentChange': percentChange,
+      });
+    });
+
+    // 5. High Spend Days Pattern
+    // Simple heuristic: Get top 2 days of week
+    final sortedDays = dayOfWeekTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    final highSpendDays = sortedDays.take(2).map((e) {
+      const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return days[e.key - 1]; // weekday is 1-7
+    }).join(' and ');
+
+    return {
+      'month': "${month.year}-${month.month.toString().padLeft(2, '0')}", // YYYY-MM
+      'totalSpend': totalSpend,
+      'previousMonthTotal': prevTotalSpend,
+      'categoryBreakdown': categoryBreakdown,
+      'highSpendDays': highSpendDays.isNotEmpty ? highSpendDays : "No specific pattern",
+    };
+  }
 }

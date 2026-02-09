@@ -18,7 +18,8 @@ class AIAgentService {
   
   // Map of agent types to their IDs
   static const Map<String, String> _agentIds = {
-    'personal': 'smart_finance_advisor', // Updated to combine personal and finance
+    'assistant': 'penny_pilot_assistant', // Unified assistant
+    'personal': 'smart_finance_advisor', // Kept for backward compatibility
     'fraud': 'fraud_agent',
     'mythbusting': 'mythbusting_agent',
     'roadmap': 'roadmap_agent',
@@ -88,8 +89,8 @@ class AIAgentService {
       // Start getting the AI response immediately
       final responseCompleter = Completer<String>();
       
-      // For personalized advice, include user financial context
-      if (agentType == 'personal') {
+      // For personalized advice or the unified assistant, include user financial context
+      if (agentType == 'personal' || agentType == 'assistant') {
         // Get user's financial context for personalization (with timeout)
         final userContext = await _personalizedAdviceService.getUserFinancialContext()
             .timeout(const Duration(seconds: 3), onTimeout: () => {});
@@ -105,7 +106,7 @@ class AIAgentService {
             _personalizedAdviceService.logAdviceInteraction(
               message, 
               response, 
-              'personal_finance'
+              agentType == 'assistant' ? 'unified_assistant' : 'personal_finance'
             ).catchError((_) {});
             responseCompleter.complete(response);
           }

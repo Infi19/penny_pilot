@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import '../../logic/transaction_parser.dart';
 import 'package:intl/intl.dart';
+import '../../utils/app_colors.dart';
 import '../../services/expense_service.dart';
 import '../../utils/expense_model.dart';
 import '../../services/scam_detection_service.dart';
+import '../../services/gemini_service.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class MessageDetailDialog extends StatelessWidget {
   final SmsMessage message;
@@ -21,7 +24,8 @@ class MessageDetailDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(message.address ?? 'Unknown Sender'),
+      backgroundColor: AppColors.background,
+      title: Text(message.address ?? 'Unknown Sender', style: const TextStyle(color: AppColors.lightest)),
       scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -53,10 +57,45 @@ class MessageDetailDialog extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text('Confidence: ${(scamResult!.confidence * 100).toStringAsFixed(1)}%'),
+                  Text('Confidence: ${(scamResult!.confidence * 100).toStringAsFixed(1)}%', style: const TextStyle(color: AppColors.lightest)),
                   const SizedBox(height: 4),
-                  Text('Reason: ${scamResult!.reason}'),
+                  Text('Reason: ${scamResult!.reason}', style: const TextStyle(color: AppColors.lightest)),
                   const SizedBox(height: 8),
+                  if (scamResult!.risk != ScamRisk.safe) ...[
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'AI Analysis',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.lightest),
+                    ),
+                    const SizedBox(height: 4),
+                    FutureBuilder<String>(
+                      future: GeminiService().explainScamMessage(scamResult!, message.body ?? ''),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const SizedBox(
+                            height: 20, 
+                            width: 20, 
+                            child: CircularProgressIndicator(strokeWidth: 2)
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Text('Could not load explanation.', style: TextStyle(color: Colors.red[300], fontSize: 12));
+                        }
+                        return MarkdownBody(
+                          data: snapshot.data ?? 'No explanation available.',
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(fontSize: 13, color: AppColors.lightest),
+                            h1: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.lightest),
+                            h2: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.lightest),
+                            h3: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.lightest),
+                            listBullet: const TextStyle(color: AppColors.lightest),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   const Text(
                     'Disclaimer: This assessment is AI-based and may not always be accurate.',
                     style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey),
@@ -89,21 +128,22 @@ class MessageDetailDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Divider(),
+            const Divider(color: AppColors.lightGrey),
             const SizedBox(height: 8),
           ],
-          const Text('Original Message:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+          const Text('Original Message:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.lightGrey)),
           const SizedBox(height: 4),
-          SelectableText(message.body ?? '', style: const TextStyle(fontSize: 14)),
+          SelectableText(message.body ?? '', style: const TextStyle(fontSize: 14, color: AppColors.lightest)),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: const Text('Close', style: TextStyle(color: AppColors.lightGrey)),
         ),
         if (transaction != null)
           FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.buttonColor, foregroundColor: AppColors.darkest),
             onPressed: () async {
               try {
                 final expenseService = ExpenseService();
@@ -118,11 +158,16 @@ class MessageDetailDialog extends StatelessWidget {
                    final shouldProceed = await showDialog<bool>(
                      context: context,
                      builder: (context) => AlertDialog(
-                       title: const Text('Possible Duplicate'),
-                       content: const Text('A transaction with this amount and merchant already exists for this date. Save anyway?'),
+                       backgroundColor: AppColors.darkGrey,
+                       title: const Text('Possible Duplicate', style: TextStyle(color: AppColors.lightest)),
+                       content: const Text('A transaction with this amount and merchant already exists for this date. Save anyway?', style: TextStyle(color: AppColors.lightest)),
                        actions: [
-                         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+                         TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel', style: TextStyle(color: AppColors.lightGrey))),
+                         FilledButton(
+                           style: FilledButton.styleFrom(backgroundColor: AppColors.buttonColor, foregroundColor: AppColors.darkest),
+                           onPressed: () => Navigator.pop(context, true), 
+                           child: const Text('Save')
+                          ),
                        ],
                      ),
                    );
@@ -182,7 +227,7 @@ class MessageDetailDialog extends StatelessWidget {
             width: 70,
             child: Text(
               '$label:',
-              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              style: const TextStyle(fontSize: 12, color: AppColors.lightGrey),
             ),
           ),
           Expanded(
@@ -191,6 +236,7 @@ class MessageDetailDialog extends StatelessWidget {
               style: TextStyle(
                 fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
                 fontSize: 14,
+                color: AppColors.lightest,
               ),
             ),
           ),

@@ -12,74 +12,21 @@ class AIAssistantScreen extends StatefulWidget {
   _AIAssistantScreenState createState() => _AIAssistantScreenState();
 }
 
-class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final AIAgentService _aiAgentService = AIAgentService();
-  final Map<String, UniqueKey> _chatKeys = {};
-  final List<AgentInfo> _agents = [
-    AgentInfo(
-      name: 'Smart Finance Advisor',
-      type: 'personal',
-      icon: Icons.auto_awesome,
-      color: Colors.deepPurple,
-      description: 'Get personalized advice based on your profile and expert financial insights',
-      isPrimary: true,
-    ),
-    AgentInfo(
-      name: 'Fraud Detective',
-      type: 'fraud',
-      icon: Icons.security,
-      color: Colors.red,
-      description: 'Identify and learn about financial fraud schemes',
-    ),
-    AgentInfo(
-      name: 'Myth Buster',
-      type: 'mythbusting',
-      icon: Icons.lightbulb,
-      color: Colors.amber,
-      description: 'Debunk financial myths and misconceptions',
-    ),
-    AgentInfo(
-      name: 'Roadmap Guide',
-      type: 'roadmap',
-      icon: Icons.map,
-      color: Colors.blue,
-      description: 'Get guidance on your financial journey',
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: _agents.length, vsync: this);
-    for (final agent in _agents) {
-      _chatKeys[agent.type] = UniqueKey();
-    }
-    
-    // Start with the primary agent (Smart Finance Advisor) selected
-    _tabController.animateTo(_agents.indexWhere((agent) => agent.isPrimary) != -1 
-                              ? _agents.indexWhere((agent) => agent.isPrimary) 
-                              : 0);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  final UniqueKey _chatKey = UniqueKey();
+  final String _agentType = 'assistant'; // Unified agent type
 
   void _clearChatHistory() async {
-    final currentAgent = _agents[_tabController.index];
-    
     // Show confirmation dialog
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.darkGrey,
         title: const Text('Clear Chat History', style: TextStyle(color: AppColors.lightest)),
-        content: Text(
-          'Are you sure you want to clear your chat history with ${currentAgent.name}?',
-          style: const TextStyle(color: AppColors.lightest),
+        content: const Text(
+          'Are you sure you want to clear your chat history?',
+          style: TextStyle(color: AppColors.lightest),
         ),
         actions: [
           TextButton(
@@ -96,12 +43,11 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
     
     if (shouldDelete == true) {
       try {
-        await _aiAgentService.deleteChatSession(currentAgent.type);
+        await _aiAgentService.deleteChatSession(_agentType);
         
-        // Generate a new key for the agent to force rebuild of ChatUI
-        setState(() {
-          _chatKeys[currentAgent.type] = UniqueKey();
-        });
+        // Reload the screen to refresh context
+        Navigator.pop(context);
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const AIAssistantScreen()));
         
         // Show success message
         if (mounted) {
@@ -120,11 +66,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
   }
 
   void _copyEntireConversation() async {
-    final currentAgent = _agents[_tabController.index];
-    
     try {
       // Get the chat history
-      final chatHistory = await _aiAgentService.getChatHistory(currentAgent.type);
+      final chatHistory = await _aiAgentService.getChatHistory(_agentType);
       
       if (chatHistory.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,7 +78,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
       }
       
       // Format the conversation
-      final formattedChat = _formatChatForCopy(chatHistory, currentAgent.name);
+      final formattedChat = _formatChatForCopy(chatHistory, 'Penny Pilot Assistant');
       
       // Copy to clipboard
       await Clipboard.setData(ClipboardData(text: formattedChat));
@@ -180,7 +124,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
       appBar: AppBar(
         elevation: 0,
         title: const Text(
-          'AI Assistant',
+          'Penny Pilot Assistant',
           style: TextStyle(
             color: AppColors.lightest,
             fontWeight: FontWeight.bold,
@@ -200,73 +144,20 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> with SingleTicker
             tooltip: 'Clear chat history',
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.tertiary,
-          labelColor: AppColors.tertiary,
-          unselectedLabelColor: AppColors.lightGrey,
-          isScrollable: true,
-          labelPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-          tabAlignment: TabAlignment.start,
-          tabs: _agents.map((agent) => Tab(
-            icon: Icon(agent.icon),
-            text: agent.name,
-          )).toList(),
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: _agents.map((agent) => _buildAgentTab(agent)).toList(),
-      ),
-    );
-  }
-
-  Widget _buildAgentTab(AgentInfo agent) {
-    return Column(
-      children: [
-        // Chat UI
-        Expanded(
-          child: ChatUI(
-            key: _chatKeys[agent.type],
-            agentType: agent.type,
-            aiService: _aiAgentService,
-            placeholderText: _getPlaceholderText(agent.type),
+      body: Column(
+        children: [
+          // Chat UI
+          Expanded(
+            child: ChatUI(
+              key: _chatKey,
+              agentType: _agentType,
+              aiService: _aiAgentService,
+              placeholderText: 'Ask about finance, fraud, myths, or plans...',
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-  
-  String _getPlaceholderText(String agentType) {
-    switch (agentType) {
-      case 'personal':
-        return 'Ask about investment concepts or for personalized financial advice...';
-      case 'fraud':
-        return 'Ask about financial scams and fraud protection...';
-      case 'mythbusting':
-        return 'Ask about financial myths and misconceptions...';
-      case 'roadmap':
-        return 'Ask for guidance on your financial journey...';
-      default:
-        return 'Type your message here...';
-    }
-  }
-}
-
-class AgentInfo {
-  final String name;
-  final String type;
-  final IconData icon;
-  final Color color;
-  final String description;
-  final bool isPrimary;
-
-  AgentInfo({
-    required this.name,
-    required this.type,
-    required this.icon,
-    required this.color,
-    required this.description,
-    this.isPrimary = false,
-  });
 } 
