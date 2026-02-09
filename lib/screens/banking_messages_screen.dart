@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/sms_service.dart';
 import '../logic/transaction_parser.dart';
 import 'widgets/message_detail_dialog.dart';
+import '../services/scam_detection_service.dart';
 
 class BankingMessagesScreen extends StatefulWidget {
   const BankingMessagesScreen({super.key});
@@ -14,13 +15,21 @@ class BankingMessagesScreen extends StatefulWidget {
 
 class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
   final SmsService _smsService = SmsService();
+  final ScamDetectionService _scamService = ScamDetectionService();
   List<SmsMessage> _messages = [];
+  Map<int, ScamResult> _scamResults = {}; // Map message hash/ID to result
   bool _isLoading = true;
   bool _hasPermission = false;
+  bool _showScamAlerts = true; // Toggle for the feature
 
   @override
   void initState() {
     super.initState();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    await _scamService.initialize();
     _loadMessages();
   }
 
@@ -28,15 +37,26 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
     setState(() => _isLoading = true);
     try {
       final messages = await _smsService.getBankingMessages();
+      
+      // Run scam analysis on all messages
+      // structure using message hashcode as key since ID might be null or duplicated in some contexts
+      Map<int, ScamResult> results = {};
+      for (var msg in messages) {
+        if (msg.body != null) {
+          results[msg.hashCode] = await _scamService.analyzeMessage(msg.body!);
+        }
+      }
+
       setState(() {
         _messages = messages;
+        _scamResults = results;
         _isLoading = false;
-        _hasPermission = true; // If we got messages (or empty list), we likely had permission/success
+        _hasPermission = true; 
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _hasPermission = false; // Assuming error means permission issue mostly
+        _hasPermission = false; 
       });
     }
   }
@@ -47,6 +67,19 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
       appBar: AppBar(
         title: const Text('Banking Messages'),
         actions: [
+          IconButton(
+            icon: Icon(_showScamAlerts ? Icons.shield : Icons.shield_outlined),
+            tooltip: _showScamAlerts ? 'Disable Scam Alerts' : 'Enable Scam Alerts',
+            color: _showScamAlerts ? Colors.green : null,
+            onPressed: () {
+              setState(() {
+                _showScamAlerts = !_showScamAlerts;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(_showScamAlerts ? 'Scam Detection Enabled' : 'Scam Detection Disabled')),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadMessages,
@@ -107,9 +140,37 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
       itemBuilder: (context, index) {
         final message = _messages[index];
         final transaction = TransactionParser.parse(message);
+        final scamResult = _scamResults[message.hashCode];
         
+        // Determine status color/icon if enabled
+        Color? statusColor;
+        IconData? statusIcon;
+        
+        if (_showScamAlerts && scamResult != null) {
+          switch (scamResult.risk) {
+            case ScamRisk.high:
+              statusColor = Colors.red;
+              statusIcon = Icons.warning_amber_rounded;
+              break;
+            case ScamRisk.suspicious:
+              statusColor = Colors.orange;
+              statusIcon = Icons.info_outline;
+              break;
+            case ScamRisk.safe:
+              statusColor = Colors.green;
+              statusIcon = Icons.check_circle_outline;
+              break;
+          }
+        }
+
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          shape: _showScamAlerts && scamResult != null && scamResult.risk != ScamRisk.safe 
+              ? RoundedRectangleBorder(
+                  side: BorderSide(color: statusColor!, width: 1),
+                  borderRadius: BorderRadius.circular(12)
+                )
+              : null,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: transaction != null 
@@ -124,9 +185,20 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
                     : Colors.grey,
               ),
             ),
-            title: Text(
-              message.address ?? 'Unknown Sender',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    message.address ?? 'Unknown Sender',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (_showScamAlerts && statusIcon != null)
+                   Tooltip(
+                     message: scamResult?.risk.name.toUpperCase() ?? '',
+                     child: Icon(statusIcon, color: statusColor, size: 16),
+                   ),
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,6 +230,7 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
                 builder: (context) => MessageDetailDialog(
                   message: message,
                   transaction: transaction,
+                  scamResult: _showScamAlerts ? scamResult : null,
                 ),
               );
             },

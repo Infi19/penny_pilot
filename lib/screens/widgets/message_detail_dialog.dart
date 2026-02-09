@@ -4,15 +4,18 @@ import '../../logic/transaction_parser.dart';
 import 'package:intl/intl.dart';
 import '../../services/expense_service.dart';
 import '../../utils/expense_model.dart';
+import '../../services/scam_detection_service.dart';
 
 class MessageDetailDialog extends StatelessWidget {
   final SmsMessage message;
   final TransactionDetails? transaction;
+  final ScamResult? scamResult;
 
   const MessageDetailDialog({
     super.key,
     required this.message,
     this.transaction,
+    this.scamResult,
   });
 
   @override
@@ -24,6 +27,44 @@ class MessageDetailDialog extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (scamResult != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: _getRiskColor(scamResult!.risk).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _getRiskColor(scamResult!.risk)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(_getRiskIcon(scamResult!.risk), color: _getRiskColor(scamResult!.risk)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Risk Level: ${scamResult!.risk.name.toUpperCase()}',
+                         style: TextStyle(
+                           fontWeight: FontWeight.bold, 
+                           color: _getRiskColor(scamResult!.risk)
+                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Confidence: ${(scamResult!.confidence * 100).toStringAsFixed(1)}%'),
+                  const SizedBox(height: 4),
+                  Text('Reason: ${scamResult!.reason}'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Disclaimer: This assessment is AI-based and may not always be accurate.',
+                    style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (transaction != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -156,5 +197,21 @@ class MessageDetailDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color _getRiskColor(ScamRisk risk) {
+    switch (risk) {
+      case ScamRisk.high: return Colors.red;
+      case ScamRisk.suspicious: return Colors.orange;
+      case ScamRisk.safe: return Colors.green;
+    }
+  }
+
+  IconData _getRiskIcon(ScamRisk risk) {
+    switch (risk) {
+      case ScamRisk.high: return Icons.warning;
+      case ScamRisk.suspicious: return Icons.info;
+      case ScamRisk.safe: return Icons.check_circle;
+    }
   }
 }
