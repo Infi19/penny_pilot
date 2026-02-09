@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_sms_inbox/flutter_sms_inbox.dart';
 import '../../logic/transaction_parser.dart';
 import 'package:intl/intl.dart';
 import '../../utils/app_colors.dart';
@@ -10,13 +9,17 @@ import '../../services/gemini_service.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 class MessageDetailDialog extends StatelessWidget {
-  final SmsMessage message;
+  final String? body;
+  final String? address;
+  final DateTime? date;
   final TransactionDetails? transaction;
   final ScamResult? scamResult;
 
   const MessageDetailDialog({
     super.key,
-    required this.message,
+    required this.body,
+    required this.address,
+    required this.date,
     this.transaction,
     this.scamResult,
   });
@@ -25,7 +28,7 @@ class MessageDetailDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.background,
-      title: Text(message.address ?? 'Unknown Sender', style: const TextStyle(color: AppColors.lightest)),
+      title: Text(address ?? 'Unknown Sender', style: const TextStyle(color: AppColors.lightest)),
       scrollable: true,
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -70,7 +73,7 @@ class MessageDetailDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     FutureBuilder<String>(
-                      future: GeminiService().explainScamMessage(scamResult!, message.body ?? ''),
+                      future: GeminiService().explainScamMessage(scamResult!, body ?? ''),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const SizedBox(
@@ -133,7 +136,7 @@ class MessageDetailDialog extends StatelessWidget {
           ],
           const Text('Original Message:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.lightGrey)),
           const SizedBox(height: 4),
-          SelectableText(message.body ?? '', style: const TextStyle(fontSize: 14, color: AppColors.lightest)),
+          SelectableText(body ?? '', style: const TextStyle(fontSize: 14, color: AppColors.lightest)),
         ],
       ),
       actions: [
@@ -188,7 +191,7 @@ class MessageDetailDialog extends StatelessWidget {
                   date: transaction!.date,
                   notes: 'Auto-logged from SMS',
                   isAutoLogged: true,
-                  originalMessage: message.body,
+                  originalMessage: body,
                   type: type,
                 );
 

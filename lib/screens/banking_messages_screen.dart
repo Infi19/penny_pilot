@@ -85,12 +85,92 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Test Scam Detection',
+            onPressed: _showTestScamDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadMessages,
           ),
         ],
       ),
       body: _buildBody(),
+    );
+  }
+
+  void _showTestScamDialog() {
+    final TextEditingController _testController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.darkGrey,
+        title: const Text('Test Scam Detection', style: TextStyle(color: AppColors.lightest)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Paste a message to analyze:',
+              style: TextStyle(color: AppColors.lightGrey),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _testController,
+              maxLines: 5,
+              style: const TextStyle(color: AppColors.lightest),
+              decoration: const InputDecoration(
+                hintText: 'Enter suspicious text...',
+                hintStyle: TextStyle(color: Colors.grey),
+                border: OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.lightGrey)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.accent)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.lightGrey)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.buttonColor, foregroundColor: AppColors.darkest),
+            onPressed: () async {
+              Navigator.pop(context); // Close input dialog
+              
+              if (_testController.text.trim().isEmpty) return;
+              
+              // Show loading
+              showDialog(
+                context: context, 
+                barrierDismissible: false,
+                builder: (ctx) => const Center(child: CircularProgressIndicator())
+              );
+              
+              // Analyze
+              final result = await _scamService.analyzeMessage(_testController.text);
+              
+              Navigator.pop(context); // Close loading
+              
+              // Show Result using existing dialog
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => MessageDetailDialog(
+                    body: _testController.text,
+                    address: 'Test Sender',
+                    date: DateTime.now(),
+                    transaction: null, // No transaction parsing for test
+                    scamResult: result,
+                  ),
+                );
+              }
+            },
+            child: const Text('Analyze'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -235,7 +315,9 @@ class _BankingMessagesScreenState extends State<BankingMessagesScreen> {
               showDialog(
                 context: context,
                 builder: (context) => MessageDetailDialog(
-                  message: message,
+                  body: message.body,
+                  address: message.address,
+                  date: message.date,
                   transaction: transaction,
                   scamResult: _showScamAlerts ? scamResult : null,
                 ),

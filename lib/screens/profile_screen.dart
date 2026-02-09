@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/currency_util.dart';
+import '../services/gemini_service.dart';
 import 'login_screen.dart';
 import 'financial_health_screen.dart';
 
@@ -23,7 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _bioController = TextEditingController();
   final _authService = AuthService();
   final _userService = UserService();
+  final _geminiService = GeminiService(); // Access the singleton
   final _imagePicker = ImagePicker();
+  final _apiKeyController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
   Map<String, dynamic>? _userData;
@@ -33,7 +36,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    super.initState();
     _loadUserData();
+    _loadApiKey();
+  }
+  
+  Future<void> _loadApiKey() async {
+    // Determine which key to show - only show if it's a custom key
+    if (_geminiService.isUsingCustomKey) {
+      setState(() {
+        _apiKeyController.text = _geminiService.currentCustomApiKey ?? '';
+      });
+    }
   }
 
   @override
@@ -41,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _bioController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -193,6 +208,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         }
+      }
+    }
+  }
+
+  Future<void> _updateApiKey() async {
+    final newKey = _apiKeyController.text.trim();
+    if (newKey.isNotEmpty) {
+      setState(() => _isLoading = true);
+      
+      // Test the key first
+      final String? errorMsg = await _geminiService.testApiKey(newKey);
+      
+      if (errorMsg != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Verification Failed: $errorMsg'),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+      
+      try {
+        await _geminiService.setCustomApiKey(newKey);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('API Key verified and updated successfully'),
+              backgroundColor: AppColors.mediumGrey,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating API Key: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } else {
+      // If empty, ask to remove? Or just ignore.
+      // Let's assume empty means remove custom key
+       setState(() => _isLoading = true);
+      try {
+        await _geminiService.setCustomApiKey(null);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Custom API Key removed. Using default if available.'),
+              backgroundColor: AppColors.mediumGrey,
+            ),
+          );
+        }
+      } catch (e) {
+        // error handling
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -608,6 +689,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+
+                    // AI Settings Section
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkGrey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Text(
+                              'AI Configuration',
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.key, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Gemini API Key', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_isEditing)
+                                  TextFormField(
+                                    controller: _apiKeyController,
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter your Gemini API Key',
+                                      hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
+                                      helperText: 'Leave empty to use default key',
+                                      helperStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.5)),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                    ),
+                                    obscureText: true, // Hide the key
+                                  )
+                                else
+                                  Text(
+                                    _geminiService.isUsingCustomKey 
+                                        ? '••••••••••••••••' // Masked
+                                        : 'Using default system key',
+                                    style: const TextStyle(color: AppColors.lightGrey),
+                                  ),
+                              ],
+                            ),
+                            trailing: _isEditing 
+                                ? IconButton(
+                                    icon: const Icon(Icons.save_as, color: AppColors.accent),
+                                    onPressed: _updateApiKey,
+                                    tooltip: 'Save API Key',
+                                  )
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // AI Settings Section
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.darkGrey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Text(
+                              'AI Configuration',
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            dense: true,
+                            horizontalTitleGap: 10,
+                            leading: const Icon(Icons.key, color: AppColors.mediumGrey, size: 24),
+                            title: const Text('Gemini API Key', style: TextStyle(color: AppColors.lightest, fontSize: 15)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_isEditing)
+                                  TextFormField(
+                                    controller: _apiKeyController,
+                                    style: const TextStyle(color: AppColors.lightest),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter your Gemini API Key',
+                                      hintStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.7)),
+                                      helperText: 'Leave empty to use default key',
+                                      helperStyle: TextStyle(color: AppColors.lightGrey.withOpacity(0.5)),
+                                      enabledBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                      focusedBorder: UnderlineInputBorder(
+                                        borderSide: BorderSide(color: AppColors.mediumGrey),
+                                      ),
+                                    ),
+                                    obscureText: true, // Hide the key
+                                  )
+                                else
+                                  Text(
+                                    _geminiService.isUsingCustomKey 
+                                        ? '••••••••••••••••' // Masked
+                                        : 'Using default system key',
+                                    style: const TextStyle(color: AppColors.lightGrey),
+                                  ),
+                              ],
+                            ),
+                            trailing: _isEditing 
+                                ? IconButton(
+                                    icon: const Icon(Icons.save_as, color: AppColors.accent),
+                                    onPressed: _updateApiKey,
+                                    tooltip: 'Save API Key',
+                                  )
+                                : null,
+                          ),
+                        ],
                       ),
                     ),
 

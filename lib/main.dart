@@ -45,7 +45,8 @@ Future<void> initServices() async {
   await SharedPreferences.getInstance();
   
   // Pre-initialize singletons for faster app startup
-  GeminiService(); // This initializes the GeminiService singleton
+  final geminiService = GeminiService(); // This initializes the GeminiService singleton
+  await geminiService.loadCustomApiKey(); // Load custom key if available
   final quizService = QuizService(); // Initialize quiz service
   
   // Always check for daily quiz updates to ensure fresh content every day

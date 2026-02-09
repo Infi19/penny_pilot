@@ -72,47 +72,55 @@ class ScamDetectionService {
         }
       }
       
-      ScamRisk risk;
-      String reason;
+      ScamRisk modelRisk;
+      String modelReason;
       
       switch (maxIndex) {
         case 0: // Safe
-          risk = ScamRisk.safe;
-          reason = "No suspicious patterns detected by AI.";
+          modelRisk = ScamRisk.safe;
+          modelReason = "No suspicious patterns detected by AI.";
           break;
         case 1: // Suspicious
-          risk = ScamRisk.suspicious;
-          reason = "Content resembles known promotional or unsolicited offers.";
+          modelRisk = ScamRisk.suspicious;
+          modelReason = "Content resembles known promotional or unsolicited offers.";
           break;
         case 2: // Scam
-          risk = ScamRisk.high;
-          reason = "High-risk content detected (urgency, threats, or suspicious links).";
+          modelRisk = ScamRisk.high;
+          modelReason = "High-risk content detected (urgency, threats, or suspicious links).";
           break;
         default:
-          risk = ScamRisk.safe;
-          reason = "Analysis inconclusive.";
+          modelRisk = ScamRisk.safe;
+          modelReason = "Analysis inconclusive.";
       }
+
+      // ALWAYS run heuristics to catch things the model might miss
+      final heuristicResult = _fallbackAnalysis(text);
       
-      // Populate indicators using heuristics even if model was used, 
-      // because the model only gives a probability score.
-      List<String> indicators = [];
-      if (risk != ScamRisk.safe) {
-         // Re-run simple heuristic check to find *why* it might be suspicious for valid explanation
-         // This is a hybrid approach: Model gives score, Heuristics give explanation keywords/indicators
-         final heuristicResult = _fallbackAnalysis(text);
-         indicators = heuristicResult.indicators;
-         
-         // If heuristics didn't find anything but model says scam, add generic indicator
-         if (indicators.isEmpty) {
-           indicators.add("AI Model Detection");
-         }
+      // Merge results - Logic: Be conservative, take the higher risk
+      ScamRisk finalRisk = modelRisk;
+      String finalReason = modelReason;
+      List<String> finalIndicators = [];
+      double finalConfidence = maxProb;
+
+      // If heuristics show higher risk, override
+      if (heuristicResult.risk.index > modelRisk.index) {
+        finalRisk = heuristicResult.risk;
+        finalReason = heuristicResult.reason;
+        finalConfidence = heuristicResult.confidence; // Trust the heuristic confidence if we override
+        finalIndicators = heuristicResult.indicators;
+      } else if (modelRisk != ScamRisk.safe) {
+        // If model found something, try to add heuristic indicators for context
+        finalIndicators = heuristicResult.indicators;
+        if (finalIndicators.isEmpty) {
+           finalIndicators.add("AI Model Detection");
+        }
       }
-      
+
       return ScamResult(
-        risk: risk, 
-        confidence: maxProb, 
-        reason: reason,
-        indicators: indicators
+        risk: finalRisk, 
+        confidence: finalConfidence, 
+        reason: finalReason,
+        indicators: finalIndicators
       );
       
     } catch (e) {

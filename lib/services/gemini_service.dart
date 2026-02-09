@@ -13,26 +13,57 @@ class GeminiService {
   // LRU cache to store recent responses
   final int _cacheSize = 50;
   final Map<String, String> _responseCache = LinkedHashMap(equals: (a, b) => a == b, hashCode: (k) => k.hashCode);
+  
+  // Custom API Key support
+  String? _customApiKey;
+  static const String _kCustomApiKeyPrefsKey = 'custom_gemini_api_key';
 
   // Private constructor
   GeminiService._() {
+    // Verify key availability - check both env and potential custom key (though custom key is loaded async later)
     final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
-      throw Exception('Gemini API key not found. Please add your API key to .env file');
+    if ((apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') && _customApiKey == null) {
+      print('Warning: Gemini API key not found in .env. Waiting for custom key or user input.');
     }
     
-    // Initialize the model with the API key - using gemini-flash for faster responses
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash', // Using the faster model variant
-      apiKey: apiKey,
-      generationConfig: GenerationConfig(
-        temperature: 0.7, // Increased temperature for more creative responses and variability
-        topP: 0.9,         // Increased to allow more diverse sampling
-        topK: 40,          // Increased to consider more tokens during generation
-        maxOutputTokens: 2000, // Increased to allow for longer outputs, especially for quiz questions
-        stopSequences: ['\n\n\n'],
-      ),
-    );
+    _initModel();
+  }
+
+  // Initialize or re-initialize the model
+  void _initModel() {
+    String? apiKey = _customApiKey;
+    print('GeminiService DEBUG: Initializing model. Custom Key present: ${_customApiKey != null}');
+    
+    // Fallback to .env if no custom key
+    if (apiKey == null || apiKey.isEmpty) {
+      apiKey = dotenv.env['GEMINI_API_KEY'];
+      print('GeminiService DEBUG: Using .env key');
+    } else {
+      print('GeminiService DEBUG: Using custom key: ${apiKey.substring(0, 4)}...');
+    }
+    
+    if (apiKey == null || apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
+      print('GeminiService: No valid API key found during initialization');
+      return; 
+    }
+
+    try {
+      // Initialize the model with the API key
+      _model = GenerativeModel(
+        model: 'gemini-2.5-flash', 
+        apiKey: apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.7,
+          topP: 0.9,
+          topK: 40,
+          maxOutputTokens: 2000,
+          stopSequences: ['\n\n\n'],
+        ),
+      );
+      print('GeminiService: Model initialized successfully');
+    } catch (e) {
+      print('GeminiService: Error initializing model: $e');
+    }
   }
 
   // Factory constructor to return the singleton instance
@@ -449,4 +480,73 @@ Provide concise, personalized advice based on this context.
       return "Error generating explanation: $e";
     }
   }
-} 
+
+  // Load custom API key from SharedPreferences
+  Future<void> loadCustomApiKey() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = prefs.getString(_kCustomApiKeyPrefsKey);
+      
+      if (key != null && key.isNotEmpty) {
+        print('GeminiService: Loaded custom API key');
+        _customApiKey = key;
+        // Re-initialize logic if needed, but usually this is called before usage
+        _initModel();
+        // Clear sessions to ensure new key is used
+        resetAllSessions();
+      }
+    } catch (e) {
+      print('GeminiService: Error loading custom API key: $e');
+    }
+  }
+
+  // Set or remove custom API key
+  Future<void> setCustomApiKey(String? key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      if (key == null || key.isEmpty) {
+        await prefs.remove(_kCustomApiKeyPrefsKey);
+        _customApiKey = null;
+        print('GeminiService: Custom API key removed');
+      } else {
+        await prefs.setString(_kCustomApiKeyPrefsKey, key);
+        _customApiKey = key;
+        print('GeminiService: Custom API key saved');
+      }
+      
+      // Re-initialize model with new key configuration
+      _initModel();
+      // Clear sessions to ensure new key is used
+      resetAllSessions();
+    } catch (e) {
+      print('GeminiService: Error setting custom API key: $e');
+      throw e;
+    }
+  }
+
+  // Test the API key validity
+  Future<String?> testApiKey(String apiKey) async {
+    try {
+      print('GeminiService DEBUG: Testing API key...');
+      // Create a temporary model instance for testing
+      final model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: apiKey,
+      );
+      
+      final response = await model.generateContent([Content.text('Test')]);
+      print('GeminiService DEBUG: API key test successful. Response: ${response.text}');
+      return null; // Null means success
+    } catch (e) {
+      print('GeminiService DEBUG: API key test failed: $e');
+      return e.toString(); // Return error message
+    }
+  }
+
+  // Getter to check if using custom key
+  bool get isUsingCustomKey => _customApiKey != null && _customApiKey!.isNotEmpty;
+  
+  // Getter for the current custom key (for UI population)
+  String? get currentCustomApiKey => _customApiKey;
+}
