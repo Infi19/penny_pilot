@@ -1,4 +1,3 @@
-** note we have shut down the firebase server so you wont be able to login into the app and use it
 # Penny Pilot
 
 <p align="center">
@@ -135,9 +134,6 @@ This app uses Firebase App Check to prevent unauthorized access to backend resou
 - SHA-256 fingerprints in Firebase Console
 - Google Play Integrity API for Android
 
-## 🙏 Acknowledgements
+## 🤝 Contributing
 
-- [Flutter](https://flutter.dev/)
-- [Firebase](https://firebase.google.com/)
-- [Google AI Studio](https://ai.google.dev/)
-- [TensorFlow Lite](https://www.tensorflow.org/lite)
+Contributions are welcome! Please feel free to submit a Pull Request.
