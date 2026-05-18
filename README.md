@@ -8,8 +8,6 @@ A comprehensive mobile application for financial education, management, and AI-p
 
 ## 📱 Features
 
--Gu khavya Pranav
-
 ### 🤖 Unified AI Assistant (Penny Pilot Assistant)
 An all-in-one AI companion powered by **Google Gemini 2.5 Flash** that handles multiple financial roles:
 - **Personal Financial Coach:** Analyzes your spending patterns and provides actionable insights.
